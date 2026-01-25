@@ -49,3 +49,25 @@ coverage/
 anthropic-skills/
 ui-ux-pro-max-skill/
 aloneskills/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Docker volumes
+data/
+postgres-data/
+redis-data/
+minio-data/
+
+# Directus uploads
+directus-uploads/
+
+# Subsystem environments
+apps/plane/.env
+apps/nocodb/.env
+apps/midday/.env
+apps/inventory/.env
+apps/learning/.env
+apps/docs/.env

@@ -1,0 +1,22 @@
+/* MedusaJS Headless Styles - Inject via Portal */
+/* Hide Medusa Admin native navigation elements */
+
+/* Hide sidebar */
+.sidebar,
+[data-sidebar],
+aside {
+  display: none !important;
+}
+
+/* Hide header */
+header,
+.admin-header {
+  display: none !important;
+}
+
+/* Expand main content */
+main,
+.main-content {
+  margin-left: 0 !important;
+  width: 100% !important;
+}

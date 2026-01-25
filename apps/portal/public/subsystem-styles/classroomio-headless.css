@@ -1,0 +1,22 @@
+/* ClassroomIO Headless Styles - Inject via Portal */
+/* Hide ClassroomIO native navigation elements */
+
+/* Hide navigation */
+nav,
+.nav-container,
+[data-nav] {
+  display: none !important;
+}
+
+/* Hide sidebar */
+.sidebar,
+aside {
+  display: none !important;
+}
+
+/* Expand main content */
+main {
+  margin-left: 0 !important;
+  width: 100% !important;
+  padding-top: 0 !important;
+}

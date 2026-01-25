@@ -1,0 +1,22 @@
+/* AppFlowy Headless Styles - Inject via Portal */
+/* Hide AppFlowy native navigation elements */
+
+/* Hide sidebar */
+.sidebar,
+[data-sidebar],
+.workspace-sidebar {
+  display: none !important;
+}
+
+/* Hide title bar */
+.title-bar,
+.window-controls {
+  display: none !important;
+}
+
+/* Expand editor */
+.editor-container,
+main {
+  margin-left: 0 !important;
+  width: 100% !important;
+}
