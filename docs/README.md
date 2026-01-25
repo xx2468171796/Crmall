@@ -1,0 +1,15 @@
+# Documentation
+
+This directory contains technical documentation for the Midday.
+
+## Contents
+
+- **[inbox-matching.md](./inbox-matching.md)** - Detailed documentation of the AI-powered inbox matching algorithm that automatically matches receipts and invoices with bank transactions.
+- **[invoice-recurring.md](./invoice-recurring.md)** - Technical documentation of the recurring invoice system including architecture, state machine, generation flow, and key design decisions.
+- **[document-processing.md](./document-processing.md)** - Technical documentation of the document processing pipeline including AI classification, graceful degradation, retry functionality, and error handling.
+
+## About
+
+This documentation provides in-depth technical details about core Midday features and algorithms. It's intended for developers working on the codebase who need to understand the implementation details, data flows, and architectural decisions.
+
+The documentation here is kept in sync with the actual implementation and provides more technical depth than the user-facing documentation in the apps/docs directory.
