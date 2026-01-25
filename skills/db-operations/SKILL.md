@@ -7,6 +7,10 @@ description: 数据库操作技能。在需要进行数据库查询、创建、�
 
 执行数据库相关操作时，遵循以下流程和规范。
 
+## 连接信息
+
+查看 `references/connections.md` 获取数据库、Redis、MinIO 的连接信息。
+
 ## 技术栈
 
 - **Prisma v6+** - ORM 框架
