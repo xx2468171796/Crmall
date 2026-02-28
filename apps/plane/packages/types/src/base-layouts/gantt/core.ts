@@ -1,6 +1,0 @@
-export const CORE_GANTT_TIMELINE_TYPE = {
-  ISSUE: "ISSUE",
-  MODULE: "MODULE",
-  PROJECT: "PROJECT",
-  GROUPED: "GROUPED",
-} as const;

@@ -1,0 +1,46 @@
+schema: spec-driven
+
+# TWCRM 项目上下文
+context: |
+  项目: TWCRM — 台湾智能家居 CRM 系统
+  架构: Next.js 16 全栈一体 + Teable 源码集成
+  技术栈: pnpm 10 + Prisma 7 + PostgreSQL 17 + Redis 7 + Auth.js v5
+  模式: 集团总部 + 多子公司 (行级多租户隔离)
+  编码: 严格 OOP (Component → Hook → Service → Repository → Entity)
+  国际化: next-intl (zh-CN 默认 / zh-TW / en)
+  UI: Tailwind CSS 4 + Shadcn UI (Zinc 主题)
+  实时: Socket.IO + Redis Pub/Sub
+  文档: BlockNote (Notion 风格)
+  表格: Teable (源码集成)
+
+# 每个 artifact 的规则
+rules:
+  proposal:
+    - 必须说明对哪些 Schema (auth/system/crm/ordering/inventory/finance/okr/docs/lms) 有影响
+    - 必须说明是否涉及多租户 (tenantId) 变更
+    - 必须说明是否需要新增权限 (Permission)
+    - 必须说明对 WebSocket 事件的影响
+    - 必须说明对 i18n 翻译文件的影响
+    - 包含 "Non-goals" 部分，明确不做什么
+    - 保持在 800 字以内
+
+  design:
+    - 必须包含 Prisma Schema 变更（如有）
+    - 必须包含 Service 类接口定义
+    - 必须包含 Server Action 签名
+    - 必须遵循 OOP 分层 (Service → Repository → Entity)
+    - 如涉及 UI，必须说明使用哪些 Shadcn 组件
+    - 如涉及实时功能，必须定义 WebSocket 事件类型
+
+  tasks:
+    - 每个任务不超过 2 小时工作量
+    - 任务按依赖顺序排列（先 Schema → Service → Action → UI）
+    - 必须包含 i18n 翻译任务
+    - 必须包含权限配置任务（如涉及新模块）
+    - 标注每个任务影响的文件路径
+
+  spec:
+    - 必须包含 "数据模型" 部分（Prisma Schema 片段）
+    - 必须包含 "权限" 部分（所需 Permission 列表）
+    - 必须包含 "API" 部分（Server Action 签名）
+    - 如涉及 UI，必须包含 "页面/组件" 部分

@@ -1,151 +1,114 @@
 ---
 name: ui-components
-description: UI 组件开发技能。在需要创建页面、组件、表单、表格、弹窗等 UI 元素时使用此技能。基于 shadcn/ui + Tailwind CSS v4 + React 19 + 原子化设计模式。
+description: UI 组件开发技能。在需要创建页面、组件、表单、表格、弹窗等 UI 元素时使用此技能。基于 shadcn/ui + Tailwind CSS v4 + React 19 + OOP 分层架构。
 ---
 
 # UI 组件技能 (UI Components Skill)
 
-创建 UI 组件时，遵循原子化设计模式和项目规范。
+创建 UI 组件时，遵循 OOP 分层架构和项目规范。
 
 ## 技术栈
 
 - **React 19** - UI 框架
-- **shadcn/ui** - 组件库
+- **shadcn/ui** - 组件库 (Zinc 主题)
 - **Tailwind CSS v4** - 样式引擎
 - **Lucide React** - 图标库
-- **React Hook Form** + **Zod** - 表单处理
+- **React Hook Form 7** + **Zod 4** - 表单处理
+- **TanStack Table 8** - 数据表格
+- **next-intl** - 国际化
+- **dnd-kit** - 拖拽排序
 
-## 组件层级结构
+## 组件分层
 
 ```
-src/components/
-├── ui/           # Atoms - shadcn 基础组件
-├── shared/       # Molecules - 业务通用组件
-└── features/     # Organisms - 特定业务模块
+UI 组件（只负责展示）
+    ↓ 调用
+自定义 Hook（组合逻辑）
+    ↓ 调用
+Server Action（后端交互）
+    ↓ 调用
+Service 类（业务逻辑）
+    ↓ 调用
+Repository 类（数据访问）
 ```
 
-### Atoms (原子组件)
+## 组件目录结构
 
-最基础的 UI 元素，直接使用 shadcn/ui。
-
-```bash
-# 添加 shadcn 组件
-npx shadcn@latest add button
-npx shadcn@latest add input
-npx shadcn@latest add card
+```
+src/features/{module}/components/
+├── {name}-list.tsx       # 列表页
+├── {name}-form.tsx       # 表单（创建/编辑）
+├── {name}-detail.tsx     # 详情页
+├── {name}-card.tsx       # 卡片组件
+└── {name}-columns.tsx    # 表格列定义
 ```
 
-### Molecules (分子组件)
+## 组件规范
 
-组合多个原子组件，形成可复用的业务组件。
+### 基本规则
+- 单个组件不超过 150 行
+- 组件只负责展示，业务逻辑抽到 Hook/Service
+- 必须支持 Light/Dark 主题
+- 所有文案使用 `useTranslations()` (next-intl)
+- 使用 Shadcn UI 组件，不自己造轮子
+
+### 列表组件示例
 
 ```tsx
-// src/components/shared/search-input.tsx
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Search } from "lucide-react"
+// src/features/ordering/components/order-list.tsx
+"use client"
 
-interface SearchInputProps {
-  placeholder?: string
-  onSearch: (value: string) => void
-}
+import { useTranslations } from "next-intl"
+import { DataTable } from "@/components/ui/data-table"
+import { useOrderList } from "../hooks/use-order-list"
+import { orderColumns } from "./order-columns"
 
-export function SearchInput({ placeholder, onSearch }: SearchInputProps) {
+export function OrderList() {
+  const t = useTranslations("ordering")
+  const { data, isLoading } = useOrderList()
+
   return (
-    <div className="flex gap-2">
-      <Input placeholder={placeholder} />
-      <Button size="icon" variant="outline">
-        <Search className="h-4 w-4" />
-      </Button>
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold">{t("title")}</h1>
+      <DataTable
+        columns={orderColumns}
+        data={data?.items ?? []}
+        isLoading={isLoading}
+      />
     </div>
   )
 }
 ```
 
-### Organisms (组织组件)
-
-完整的业务功能模块，可包含状态和副作用。
+### 表单组件示例
 
 ```tsx
-// src/components/features/customer-table.tsx
+// src/features/ordering/components/order-form.tsx
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
-import { getCustomers } from "@/actions/customer"
-import { DataTable } from "@/components/shared/data-table"
-import { columns } from "./columns"
-
-export function CustomerTable() {
-  const { data, isLoading } = useQuery({
-    queryKey: ["customers"],
-    queryFn: getCustomers,
-  })
-
-  if (isLoading) return <Skeleton />
-  
-  return <DataTable columns={columns} data={data ?? []} />
-}
-```
-
-## 核心规范
-
-### 1. 组件大小限制
-
-单个组件文件 **不超过 150 行**。超过则拆分。
-
-### 2. 单一职责
-
-- UI 组件只负责展示
-- 业务逻辑抽离到 Hooks
-- 数据获取抽离到 Server Actions
-
-### 3. 样式规范
-
-```tsx
-// ✅ 正确 - 使用 Tailwind
-<div className="flex items-center gap-4 p-4 rounded-lg bg-card">
-
-// ❌ 错误 - 禁止内联样式
-<div style={{ display: 'flex', padding: '16px' }}>
-
-// ❌ 错误 - 禁止 CSS 文件
-import "./styles.css"
-```
-
-### 4. 响应式设计
-
-```tsx
-// 使用 Tailwind 响应式前缀
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-```
-
-### 5. 图标使用
-
-```tsx
-// 统一使用 Lucide React
-import { User, Settings, LogOut } from "lucide-react"
-```
-
-## 表单模板
-
-```tsx
-"use client"
-
+import { useTranslations } from "next-intl"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { customerSchema, type CustomerFormData } from "@/schemas/customer"
+import { CreateOrderDTO } from "../schemas/order.schema"
+import { createOrderAction } from "../actions/order.actions"
+import { toast } from "sonner"
 
-export function CustomerForm() {
-  const form = useForm<CustomerFormData>({
-    resolver: zodResolver(customerSchema),
-    defaultValues: { name: "", email: "" },
+export function OrderForm() {
+  const t = useTranslations("ordering")
+  const form = useForm({
+    resolver: zodResolver(CreateOrderDTO),
   })
 
-  const onSubmit = async (data: CustomerFormData) => {
-    // 调用 Server Action
+  async function onSubmit(data: CreateOrderDTO) {
+    const result = await createOrderAction(data)
+    if (result.success) {
+      toast.success(t("orderCreated"))
+    } else {
+      toast.error(result.error)
+    }
   }
 
   return (
@@ -153,10 +116,10 @@ export function CustomerForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
-          name="name"
+          name="remark"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>客户名称</FormLabel>
+              <FormLabel>{t("remark")}</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>
@@ -164,17 +127,38 @@ export function CustomerForm() {
             </FormItem>
           )}
         />
-        <Button type="submit">保存</Button>
+        <Button type="submit">{t("submit")}</Button>
       </form>
     </Form>
   )
 }
 ```
 
+## 表格组件
+
+- 使用 TanStack Table 8
+- 服务端分页/搜索/过滤
+- URL 状态用 Nuqs 管理
+- 支持列排序、多选、批量操作
+
+## 布局
+
+- Sidebar (可折叠) + Header + Main
+- 响应式设计 (mobile-first)
+- Command+K 全局搜索 (cmdk)
+
+## 无障碍
+
+- 所有交互元素必须有 aria-label
+- 键盘导航支持
+- 颜色对比度符合 WCAG AA
+
 ## 禁止事项
 
 - ❌ 手写原生 HTML 按钮/输入框
 - ❌ 创建 .css/.scss/.less 文件
-- ❌ 使用 JS 判断窗口宽度
+- ❌ 使用 JS 判断窗口宽度（用 Tailwind 响应式前缀）
 - ❌ 组件超过 150 行不拆分
-- ❌ 在组件中直接写 SQL
+- ❌ 在组件中直接写 Prisma 查询
+- ❌ 硬编码中文/英文文案（必须走 i18n）
+- ❌ 将服务端数据存入 Zustand（用 TanStack Query）

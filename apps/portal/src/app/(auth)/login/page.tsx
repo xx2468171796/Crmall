@@ -1,113 +1,79 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-  Button,
-  Input,
-  Label,
-} from "@nexus/ui"
-import { login } from "@/actions/auth"
-
-const loginSchema = z.object({
-  email: z.string().email("请输入有效的邮箱地址"),
-  password: z.string().min(6, "密码至少6个字符"),
-})
-
-type LoginFormData = z.infer<typeof loginSchema>
+import { useActionState } from 'react'
+import { useTranslations } from 'next-intl'
+import { useSearchParams } from 'next/navigation'
+import { loginAction } from '@/features/auth/actions/auth.action'
+import type { ActionResult } from '@twcrm/shared'
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const t = useTranslations('auth')
+  const tc = useTranslations('common')
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  })
-
-  const onSubmit = async (data: LoginFormData) => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const result = await login(data)
-      if (result?.error) {
-        setError(result.error)
-      } else {
-        router.push("/dashboard")
-        router.refresh()
-      }
-    } catch {
-      setError("登录失败，请稍后重试")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const [state, formAction, isPending] = useActionState<ActionResult<null>, FormData>(
+    loginAction,
+    { success: true, data: null }
+  )
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold">登录</CardTitle>
-        <CardDescription>输入您的邮箱和密码登录系统</CardDescription>
-      </CardHeader>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <CardContent className="space-y-4">
-          {error && (
-            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-              {error}
+    <div className="flex flex-col gap-6">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold tracking-tight">TWCRM</h1>
+        <p className="text-sm text-[var(--muted-foreground)] mt-2">
+          {tc('app_name')}
+        </p>
+      </div>
+
+      <div className="rounded-lg border bg-[var(--card)] p-6 shadow-sm">
+        <form action={formAction} className="flex flex-col gap-4">
+          <input type="hidden" name="callbackUrl" value={callbackUrl} />
+
+          {!state.success && (
+            <div className="rounded-md bg-[var(--destructive)]/10 p-3 text-sm text-[var(--destructive)]">
+              {t('login_failed')}
             </div>
           )}
-          <div className="space-y-2">
-            <Label htmlFor="email">邮箱</Label>
-            <Input
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="email" className="text-sm font-medium">
+              {t('email')}
+            </label>
+            <input
               id="email"
+              name="email"
               type="email"
-              placeholder="name@example.com"
-              {...register("email")}
+              placeholder="admin@twcrm.com"
+              autoComplete="email"
+              required
+              className="flex h-10 w-full rounded-md border border-[var(--input)] bg-[var(--background)] px-3 py-2 text-sm ring-offset-[var(--background)] placeholder:text-[var(--muted-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2"
             />
-            {errors.email && (
-              <p className="text-sm text-destructive">{errors.email.message}</p>
-            )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">密码</Label>
-            <Input
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="password" className="text-sm font-medium">
+              {t('password')}
+            </label>
+            <input
               id="password"
+              name="password"
               type="password"
-              placeholder="••••••••"
-              {...register("password")}
+              autoComplete="current-password"
+              required
+              className="flex h-10 w-full rounded-md border border-[var(--input)] bg-[var(--background)] px-3 py-2 text-sm ring-offset-[var(--background)] placeholder:text-[var(--muted-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2"
             />
-            {errors.password && (
-              <p className="text-sm text-destructive">{errors.password.message}</p>
-            )}
           </div>
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-4">
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "登录中..." : "登录"}
-          </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            还没有账号？{" "}
-            <Link href="/register" className="text-primary hover:underline">
-              注册
-            </Link>
-          </p>
-        </CardFooter>
-      </form>
-    </Card>
+
+          <button
+            type="submit"
+            disabled={isPending}
+            className="inline-flex h-10 items-center justify-center rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 disabled:pointer-events-none disabled:opacity-50"
+          >
+            {isPending ? tc('loading') : t('login')}
+          </button>
+        </form>
+      </div>
+    </div>
   )
 }

@@ -1,229 +1,90 @@
----
-name: db-operations
-description: 数据库操作技能。在需要进行数据库查询、创建、更新、删除、迁移等操作时使用此技能。基于 Prisma v6 + PostgreSQL v17 Multi-Schema + Repository 模式 + Zod 验证。
----
-
-# 数据库操作技能 (Database Operations Skill)
-
-执行数据库相关操作时，遵循以下流程和规范。
-
-## 连接信息
-
-查看 `references/connections.md` 获取数据库、Redis、MinIO 的连接信息。
+# DB Operations 技能 — 数据库操作
 
 ## 技术栈
+- Prisma 7.4.x (TypeScript 重写版)
+- PostgreSQL 17
+- Multi-Schema 隔离
+- Repository 模式
 
-- **Prisma v6+** - ORM 框架
-- **PostgreSQL v17** - 主数据库
-- **Multi-Schema** - 子系统隔离
-- **Zod** - 输入验证
-- **Repository Pattern** - 数据访问封装
+## Prisma 7 关键变更（vs v6）
+- 移除 Rust 引擎，纯 TypeScript
+- 必须指定 output 路径
+- 必须安装 @prisma/adapter-pg
+- Node.js >= 20.19.0
+- import 路径从 node_modules 改为 custom output
 
-## 数据库连接
-
-```env
-# .env
-DATABASE_URL="postgres://crmall0125:xx123654@192.168.110.246:5433/crmall0125?sslmode=disable"
-```
-
-## Schema 分配
-
-| 子系统 | Schema 名称 |
-|--------|-------------|
-| Portal/Auth | `auth` |
-| CRM | `nocodb` |
-| OKR | `plane` |
-| Finance | `midday` |
-| Inventory | `medusa` |
-| Learning | `classroomio` |
-| Docs | `appflowy` |
-| Admin | `public` |
-
-## Prisma Schema 示例
+## Schema 配置
 
 ```prisma
-// prisma/schema.prisma
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["multiSchema"]
+  provider = "prisma-client-js"
+  output   = "./generated/client"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["auth", "nocodb", "plane"]
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  role      String   @default("user")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
-
-  @@schema("auth")
-}
-
-model Customer {
-  id        String   @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
-  ownerId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
-
-  @@schema("nocodb")
+  schemas  = ["auth", "crm", "ordering", "inventory", "finance", "okr", "docs", "lms"]
 }
 ```
 
-## 数据库操作流程
+## Schema 列表
 
-### 1. Schema 变更
+| Schema | 用途 |
+|--------|------|
+| auth | 用户/角色/权限/租户/Session |
+| crm | 客户/商机/合同/联系人/工单 |
+| ordering | 产品目录/订单/余额/物流 |
+| inventory | 仓库/库存/SN码/采购/调拨 |
+| finance | 收款/付款/发票 |
+| okr | OKR/KPI/项目/任务/TodoList |
+| docs | 文档/权限/引用 |
+| lms | 课程/章节/考试/证书/进度 |
 
-```bash
-# 修改 schema.prisma 后
-npx prisma migrate dev --name <migration-name>
-npx prisma generate
-```
+## Repository 模式
 
-### 2. Repository 模式
+每个模块必须通过 Repository 访问数据：
 
 ```typescript
-// src/lib/db/repositories/customer.repository.ts
-import { prisma } from "@/lib/db"
-import { Prisma } from "@prisma/client"
-
-export class CustomerRepository {
-  async findMany(where?: Prisma.CustomerWhereInput) {
-    return prisma.customer.findMany({
-      where: {
-        ...where,
-        deletedAt: null, // 默认排除已删除
-      },
-      orderBy: { createdAt: "desc" },
-    })
-  }
-
-  async findById(id: string) {
-    return prisma.customer.findUnique({
-      where: { id },
-    })
-  }
-
-  async create(data: Prisma.CustomerCreateInput) {
-    return prisma.customer.create({ data })
-  }
-
-  async update(id: string, data: Prisma.CustomerUpdateInput) {
-    return prisma.customer.update({
-      where: { id },
-      data,
-    })
-  }
-
-  async softDelete(id: string) {
-    return prisma.customer.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    })
-  }
+export interface ICustomerRepository {
+  findById(id: string): Promise<Customer | null>
+  findByTenant(tenantId: string, filters: Filters): Promise<PaginatedResult<Customer>>
+  create(data: CreateCustomerDTO): Promise<Customer>
+  update(id: string, data: UpdateCustomerDTO): Promise<Customer>
+  delete(id: string): Promise<void>
 }
 
-export const customerRepository = new CustomerRepository()
-```
-
-### 3. Server Action 调用
-
-```typescript
-// src/actions/customer/create.ts
-"use server"
-
-import { auth } from "@/lib/auth"
-import { customerRepository } from "@/lib/db/repositories/customer.repository"
-import { createCustomerSchema } from "@/schemas/customer"
-import { revalidatePath } from "next/cache"
-
-export async function createCustomer(formData: FormData) {
-  const session = await auth()
-  if (!session?.user) throw new Error("Unauthorized")
-
-  const validated = createCustomerSchema.safeParse({
-    name: formData.get("name"),
-    email: formData.get("email"),
-    phone: formData.get("phone"),
-  })
-
-  if (!validated.success) {
-    return { error: validated.error.flatten() }
-  }
-
-  await customerRepository.create({
-    ...validated.data,
-    ownerId: session.user.id,
-  })
-
-  revalidatePath("/customers")
-  return { success: true }
+export class CustomerRepository implements ICustomerRepository {
+  constructor(private readonly prisma: PrismaClient) {}
+  // 实现...
 }
 ```
 
-## Zod Schema 定义
+## 多租户自动过滤
+
+Prisma Middleware 自动注入 tenantId：
 
 ```typescript
-// src/schemas/customer.ts
-import { z } from "zod"
-
-export const createCustomerSchema = z.object({
-  name: z.string().min(1, "客户名称不能为空"),
-  email: z.string().email("请输入有效邮箱").optional().or(z.literal("")),
-  phone: z.string().optional(),
+prisma.$use(async (params, next) => {
+  const tenantId = getCurrentTenantId()
+  if (tenantId && TENANT_MODELS.includes(params.model)) {
+    if (['findMany', 'findFirst', 'count'].includes(params.action)) {
+      params.args.where = { ...params.args.where, tenantId }
+    }
+    if (params.action === 'create') {
+      params.args.data.tenantId = tenantId
+    }
+  }
+  return next(params)
 })
-
-export const updateCustomerSchema = createCustomerSchema.partial()
-
-export type CreateCustomerInput = z.infer<typeof createCustomerSchema>
-export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>
 ```
 
-## 事务处理
+## 事务规范
+
+涉及多表操作必须用事务：
 
 ```typescript
-// 多表操作使用事务
 await prisma.$transaction(async (tx) => {
-  const order = await tx.order.create({ data: orderData })
-  
-  await tx.orderItem.createMany({
-    data: items.map(item => ({
-      orderId: order.id,
-      ...item,
-    })),
-  })
-  
-  await tx.inventory.updateMany({
-    where: { productId: { in: productIds } },
-    data: { quantity: { decrement: 1 } },
-  })
-  
-  return order
+  // 所有操作在同一个事务中
 })
 ```
-
-## 核心规范
-
-1. **Schema First** - 先改 schema.prisma，再生成迁移
-2. **Repository 封装** - 禁止在组件中直接使用 Prisma
-3. **Zod 验证** - 所有输入必须验证
-4. **软删除** - 使用 deletedAt，禁止物理删除
-5. **类型安全** - 使用 Prisma 生成的类型
-
-## 禁止事项
-
-- ❌ 直接在组件中调用 prisma
-- ❌ 不经过 Zod 验证直接插入数据
-- ❌ 物理删除用户数据
-- ❌ 硬编码数据库连接字符串
-- ❌ 跳过迁移直接修改数据库

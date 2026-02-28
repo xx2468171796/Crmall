@@ -1,3 +1,7 @@
-import { GET, POST } from "@nexus/auth"
+// ============================================
+// Auth.js Route Handler
+// ============================================
 
-export { GET, POST }
+import { handlers } from '@/lib/auth'
+
+export const { GET, POST } = handlers

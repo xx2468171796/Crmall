@@ -1,49 +1,60 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "project": "TWCRM",
   "skills": [
     {
       "name": "auth",
-      "description": "用户认证与会话管理技能。在需要实现登录、注册、登出、Session 管理、OAuth 集成、密码重置等功能时使用此技能。基于 Auth.js v5 + Redis Session Store + Directus RBAC。",
+      "description": "用户认证与会话管理。登录/注册/登出/Session/OAuth/密码重置。基于 Auth.js v5 + Redis Session + 自建 RBAC。",
       "path": "auth/SKILL.md"
     },
     {
       "name": "ui-components",
-      "description": "UI 组件开发技能。在需要创建页面、组件、表单、表格、弹窗等 UI 元素时使用此技能。基于 shadcn/ui + Tailwind CSS v4 + React 19 + 原子化设计模式。",
+      "description": "UI 组件开发。页面/组件/表单/表格/弹窗。基于 Shadcn UI + Tailwind CSS v4 + React 19 + 原子化设计。",
       "path": "ui-components/SKILL.md"
     },
     {
       "name": "rbac",
-      "description": "角色权限控制技能。在需要实现权限检查、菜单授权、路由守卫、数据范围控制等功能时使用此技能。基于 Directus RBAC + Auth.js Session + 中间件守卫。",
+      "description": "角色权限控制。权限检查/菜单授权/路由守卫/数据范围/多租户隔离。基于自建 RBAC + Auth.js Session + Prisma Middleware。",
       "path": "rbac/SKILL.md"
     },
     {
-      "name": "feature-evaluation",
-      "description": "新功能评估技能。在开始任何新功能开发前使用此技能，评估技术约束、检查架构原则、确认是否需要 OpenSpec 提案。确保开发符合项目规范。",
-      "path": "feature-evaluation/SKILL.md"
+      "name": "db-browser",
+      "description": "数据库浏览器。查看表结构/查询数据/执行SQL/Redis/MinIO。Windows 本地开发环境，基于 psql 18 + Prisma Studio。",
+      "path": "db-browser/SKILL.md"
     },
     {
       "name": "db-operations",
-      "description": "数据库操作技能。在需要进行数据库查询、创建、更新、删除、迁移等操作时使用此技能。基于 Prisma v6 + PostgreSQL v17 Multi-Schema + Repository 模式 + Zod 验证。",
+      "description": "数据库操作。CRUD/迁移/事务/Multi-Schema。基于 Prisma 7 + PostgreSQL 17 + Repository 模式 + Zod 校验。",
       "path": "db-operations/SKILL.md"
     },
     {
+      "name": "websocket",
+      "description": "WebSocket 实时系统。事件推送/房间管理/实时通知。基于 Socket.IO + Redis Pub/Sub + Auth.js 认证。",
+      "path": "websocket/SKILL.md"
+    },
+    {
+      "name": "feature-evaluation",
+      "description": "新功能评估。开始开发前评估技术约束/架构原则/编码规范。确保符合 OOP 分层架构和项目规范。",
+      "path": "feature-evaluation/SKILL.md"
+    },
+    {
       "name": "build-standards",
-      "description": "打包构建规范技能。在需要配置开发环境、生产构建、Docker 镜像、Tauri 桌面端、环境变量等时使用此技能。基于 Turbopack + Next.js Standalone + Tauri v2 + Docker。",
+      "description": "构建规范。开发环境/生产构建/Docker/环境变量。基于 Turbopack + pnpm + Next.js Standalone。",
       "path": "build-standards/SKILL.md"
     },
     {
       "name": "testing",
-      "description": "测试规范技能。在需要编写单元测试、集成测试、E2E 测试、组件测试时使用此技能。基于 Vitest + Playwright + React Testing Library。",
+      "description": "测试规范。单元测试/集成测试/E2E 测试。基于 Vitest + Playwright + React Testing Library。",
       "path": "testing/SKILL.md"
     },
     {
-      "name": "skill-creator",
-      "description": "创建和管理 AI 技能的指南。当需要为 CRMALL 项目创建新技能、更新现有技能、或扩展 AI 助手能力时使用此技能。包含技能结构、编写规范、验证流程。",
-      "path": "skill-creator/SKILL.md"
+      "name": "i18n",
+      "description": "国际化。多语言支持/用户级语言偏好。基于 next-intl + zh-TW/zh-CN/en。",
+      "path": "i18n/SKILL.md"
     },
     {
       "name": "ui-ux-pro-max",
-      "description": "AI 驱动的设计智能技能。当需要构建 UI/UX（设计、创建、实现、审查、修复、改进界面）时使用此技能。提供 UI 风格、配色方案、字体搭配、图表类型和 UX 指南的智能推荐。基于 shadcn/ui + Tailwind CSS v4。",
+      "description": "UI/UX 设计智能。UI 风格/配色/字体/图表/UX 指南。基于 Shadcn UI + Tailwind CSS v4。",
       "path": "ui-ux-pro-max/SKILL.md"
     }
   ]

@@ -1,21 +1,15 @@
 # Dependencies
 node_modules/
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/versions
+.pnpm-store/
 
-# Build outputs
+# Build
 .next/
-out/
 dist/
-build/
+out/
 .turbo/
 
-# Tauri
-src-tauri/target/
+# Prisma
+packages/db/generated/
 
 # Environment
 .env
@@ -23,8 +17,8 @@ src-tauri/target/
 .env.*.local
 
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
 
@@ -34,40 +28,10 @@ Thumbs.db
 
 # Debug
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+pnpm-debug.log*
 
 # Testing
 coverage/
-.nyc_output/
 
 # Misc
-*.log
 *.tsbuildinfo
-
-# Reference repos (cloned for learning)
-anthropic-skills/
-ui-ux-pro-max-skill/
-aloneskills/
-
-# Database
-*.sqlite
-*.sqlite3
-*.db
-
-# Docker volumes
-data/
-postgres-data/
-redis-data/
-minio-data/
-
-# Directus uploads
-directus-uploads/
-
-# Subsystem environments
-apps/plane/.env
-apps/nocodb/.env
-apps/midday/.env
-apps/inventory/.env
-apps/learning/.env
-apps/docs/.env

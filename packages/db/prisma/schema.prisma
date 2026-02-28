@@ -1,254 +1,1393 @@
+// ============================================
+// TWCRM — 台湾智能家居 CRM 系统
+// Prisma 7 Multi-Schema 数据库设计
+// ============================================
+
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["multiSchema"]
+  output          = "../generated/client"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
-  schemas  = ["auth", "public", "plane", "nocodb", "midday", "medusa", "classroomio", "appflowy"]
+  schemas  = ["auth", "system", "crm", "ordering", "inventory", "finance", "okr", "docs", "lms"]
 }
 
-// ============================================================
-// 第一层: SaaS 租户 (购买系统的客户)
-// ============================================================
+// ============================================
+// Schema: auth — 认证/租户/角色/权限
+// ============================================
 
+/// 租户（总部 + 子公司）
 model Tenant {
-  id          String       @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
-  code        String       @unique
+  code        String   @unique /// 唯一编码 e.g. HQ, TW-TPE, TW-TXG
   logo        String?
-  plan        TenantPlan   @default(TRIAL)
-  status      TenantStatus @default(ACTIVE)
-  maxUsers    Int          @default(50)
-  expiresAt   DateTime?
-  group       Group?
+  address     String?
+  phone       String?
+  email       String?
+  timezone    String   @default("Asia/Taipei")
+  currency    String   @default("TWD")
+  status      String   @default("active") /// active | suspended | archived
+  parentId    String?
+  parent      Tenant?  @relation("TenantTree", fields: [parentId], references: [id])
+  children    Tenant[] @relation("TenantTree")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   users       User[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  @@schema("auth")
-}
-
-enum TenantPlan {
-  TRIAL
-  BASIC
-  PRO
-  ENTERPRISE
-
-  @@schema("auth")
-}
-
-enum TenantStatus {
-  ACTIVE
-  SUSPENDED
-  EXPIRED
-
-  @@schema("auth")
-}
-
-// ============================================================
-// 第二层: 集团 (租户内唯一)
-// ============================================================
-
-model Group {
-  id        String    @id @default(cuid())
-  tenantId  String    @unique
-  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name      String
-  companies Company[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@schema("auth")
-}
-
-// ============================================================
-// 第三层: 公司
-// ============================================================
-
-model Company {
-  id          String        @id @default(cuid())
-  tenantId    String
-  groupId     String
-  group       Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  name        String
-  code        String
-  logo        String?
-  status      CompanyStatus @default(ACTIVE)
   departments Department[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  @@unique([tenantId, code])
-  @@index([tenantId])
-  @@schema("auth")
-}
-
-enum CompanyStatus {
-  ACTIVE
-  INACTIVE
+  account     TenantAccount?
 
   @@schema("auth")
 }
 
-// ============================================================
-// 第四层: 部门
-// ============================================================
-
+/// 部门
 model Department {
   id        String       @id @default(cuid())
   tenantId  String
-  companyId String
-  company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tenant    Tenant       @relation(fields: [tenantId], references: [id])
+  name      String
+  code      String
   parentId  String?
   parent    Department?  @relation("DeptTree", fields: [parentId], references: [id])
   children  Department[] @relation("DeptTree")
-  name      String
-  code      String?
   sortOrder Int          @default(0)
-  teams     Team[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  @@index([tenantId])
-  @@index([companyId])
+  users     User[]
+
+  @@unique([tenantId, code])
   @@schema("auth")
 }
 
-// ============================================================
-// 第五层: 小组
-// ============================================================
-
-model Team {
-  id           String     @id @default(cuid())
-  tenantId     String
-  companyId    String
-  departmentId String
-  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  name         String
-  leaderId     String?
-  sortOrder    Int        @default(0)
-  employees    Employee[]
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-
-  @@index([tenantId])
-  @@index([companyId])
-  @@schema("auth")
-}
-
-// ============================================================
-// 第六层: 员工
-// ============================================================
-
-model Employee {
-  id           String         @id @default(cuid())
-  tenantId     String
-  companyId    String
-  userId       String         @unique
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  teamId       String
-  team         Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  employeeNo   String
-  position     String?
-  status       EmployeeStatus @default(ACTIVE)
-  joinDate     DateTime?
-  leaveDate    DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-
-  @@unique([tenantId, employeeNo])
-  @@index([tenantId])
-  @@index([companyId])
-  @@schema("auth")
-}
-
-enum EmployeeStatus {
-  ACTIVE
-  INACTIVE
-  PROBATION
-
-  @@schema("auth")
-}
-
-// ============================================================
-// 用户与认证
-// ============================================================
-
+/// 用户
 model User {
   id            String    @id @default(cuid())
-  tenantId      String?
-  tenant        Tenant?   @relation(fields: [tenantId], references: [id])
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
   email         String    @unique
-  emailVerified DateTime?
-  name          String?
-  image         String?
-  passwordHash  String?
-  isPlatformAdmin Boolean @default(false)
-  accounts      Account[]
-  sessions      Session[]
-  employee      Employee?
+  phone         String?
+  name          String
+  avatar        String?
+  passwordHash  String
+  locale        String    @default("zh-CN") /// zh-CN | zh-TW | en
+  status        String    @default("active") /// active | disabled | locked
+  lastLoginAt   DateTime?
+  lastLoginIp   String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  roles         UserRole[]
+  sessions      Session[]
+
   @@index([tenantId])
   @@schema("auth")
 }
 
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+/// 角色
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique /// platform_admin | platform_viewer | tenant_admin | tenant_manager | tenant_user
+  displayName String
+  description String?
+  level       Int      @default(0) /// 角色层级，数字越小权限越大
+  isSystem    Boolean  @default(false) /// 系统内置角色不可删除
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@unique([provider, providerAccountId])
+  permissions RolePermission[]
+  users       UserRole[]
+
   @@schema("auth")
 }
 
+/// 权限
+model Permission {
+  id          String   @id @default(cuid())
+  module      String   /// crm | ordering | inventory | finance | okr | docs | lms | system | platform
+  action      String   /// create | read | update | delete | export | approve | assign
+  resource    String   /// customer | order | product | ...
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles       RolePermission[]
+
+  @@unique([module, action, resource])
+  @@schema("auth")
+}
+
+/// 角色-权限关联
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@schema("auth")
+}
+
+/// 用户-角色关联
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@schema("auth")
+}
+
+/// Session (Auth.js)
 model Session {
   id           String   @id @default(cuid())
-  sessionToken String   @unique
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionToken String   @unique
   expires      DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@schema("auth")
+}
+
+// ============================================
+// Schema: system — 公告/通知/系统配置/审计日志
+// ============================================
+
+/// 系统公告（总部发布，全局可见或指定租户）
+model Announcement {
+  id          String    @id @default(cuid())
+  title       String
+  content     String    /// 富文本 HTML 或 Markdown
+  type        String    @default("info") /// info | warning | urgent | maintenance
+  priority    Int       @default(0) /// 0=普通 1=重要 2=紧急
+  isTop       Boolean   @default(false) /// 是否置顶
+  targetType  String    @default("all") /// all | tenant | role | user
+  targetIds   String[]  /// 目标租户/角色/用户 ID 列表（targetType=all 时为空）
+  publishedAt DateTime?
+  expiresAt   DateTime?
+  status      String    @default("draft") /// draft | published | archived
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  reads       AnnouncementRead[]
+
+  @@index([status, publishedAt])
+  @@schema("system")
+}
+
+/// 公告已读记录
+model AnnouncementRead {
+  id             String       @id @default(cuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String
+  readAt         DateTime     @default(now())
+
+  @@unique([announcementId, userId])
+  @@schema("system")
+}
+
+/// 通知（系统自动生成 + 手动发送）
+model Notification {
+  id         String    @id @default(cuid())
+  userId     String    /// 接收人
+  tenantId   String?   /// 所属租户
+  title      String
+  content    String?
+  type       String    @default("system") /// system | order | stock | workorder | task | approval | chat
+  module     String?   /// 来源模块: crm | ordering | inventory | ...
+  refType    String?   /// 关联实体类型: order | customer | workorder | ...
+  refId      String?   /// 关联实体 ID
+  isRead     Boolean   @default(false)
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, isRead])
+  @@index([tenantId])
+  @@schema("system")
+}
+
+/// 系统配置（键值对，支持租户级覆盖）
+model SystemConfig {
+  id        String   @id @default(cuid())
+  tenantId  String?  /// null = 全局配置，有值 = 租户级覆盖
+  group     String   /// general | email | sms | payment | notification | theme
+  key       String
+  value     String   /// JSON 字符串
+  label     String?  /// 配置项中文名
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, group, key])
+  @@schema("system")
+}
+
+/// 审计日志
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String?
+  userId     String
+  userName   String
+  action     String   /// create | update | delete | login | logout | export | approve
+  module     String   /// auth | crm | ordering | inventory | finance | okr | docs | lms | system
+  resource   String   /// 操作的资源类型
+  resourceId String?  /// 操作的资源 ID
+  oldData    Json?    /// 变更前数据
+  newData    Json?    /// 变更后数据
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([userId])
+  @@index([module, resource])
+  @@schema("system")
+}
+
+/// 文件附件（全局统一管理）
+model Attachment {
+  id         String   @id @default(cuid())
+  tenantId   String?
+  module     String   /// 来源模块
+  refType    String   /// 关联实体类型
+  refId      String   /// 关联实体 ID
+  fileName   String
+  fileSize   Int      /// 字节
+  mimeType   String
+  storageKey String   /// MinIO object key
+  url        String   /// 访问 URL
+  uploadedBy String
+  createdAt  DateTime @default(now())
+
+  @@index([module, refType, refId])
+  @@schema("system")
+}
+// ============================================
+// Schema: crm — 客户/联系人/商机/合同/工单
+// ============================================
+
+/// 客户（公司/个人）
+model Customer {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  type         String   @default("company") /// company | individual
+  industry     String?  /// 行业
+  source       String?  /// 来源: website | referral | exhibition | cold_call | ad
+  phone        String?
+  email        String?
+  address      String?
+  city         String?
+  region       String?  /// 区域: 北部 | 中部 | 南部 | 东部
+  level        String   @default("normal") /// vip | important | normal | potential
+  status       String   @default("active") /// active | inactive | blacklist
+  ownerId      String?  /// 负责人 (User ID)
+  tags         String[]
+  remark       String?
+  createdBy    String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  @@schema("auth")
+  contacts     Contact[]
+  opportunities Opportunity[]
+  contracts    Contract[]
+  workOrders   WorkOrder[]
+  followUps    FollowUp[]
+
+  @@index([tenantId])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, status])
+  @@schema("crm")
 }
 
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
+/// 联系人
+model Contact {
+  id         String   @id @default(cuid())
+  tenantId   String
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  name       String
+  title      String?  /// 职位
+  phone      String?
+  mobile     String?
+  email      String?
+  wechat     String?
+  line       String?  /// LINE ID（台湾常用）
+  isPrimary  Boolean  @default(false) /// 主要联系人
+  remark     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  @@unique([identifier, token])
-  @@schema("auth")
+  @@index([tenantId])
+  @@index([customerId])
+  @@schema("crm")
 }
 
-// ============================================================
-// 数据范围枚举
-// ============================================================
+/// 商机
+model Opportunity {
+  id           String    @id @default(cuid())
+  tenantId     String
+  customerId   String
+  customer     Customer  @relation(fields: [customerId], references: [id])
+  title        String
+  amount       Decimal   @db.Decimal(12, 2) /// 预估金额
+  currency     String    @default("TWD")
+  stage        String    @default("lead") /// lead | qualified | proposal | negotiation | won | lost
+  probability  Int       @default(0) /// 赢单概率 0-100
+  expectedDate DateTime? /// 预计成交日期
+  lostReason   String?   /// 丢单原因
+  source       String?
+  ownerId      String    /// 负责人
+  tags         String[]
+  remark       String?
+  createdBy    String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-enum DataScope {
-  PLATFORM
-  GROUP
-  COMPANY
-  DEPARTMENT
-  TEAM
-  SELF
+  contracts    Contract[]
+  followUps    FollowUp[]
 
-  @@schema("auth")
+  @@index([tenantId])
+  @@index([tenantId, stage])
+  @@index([tenantId, ownerId])
+  @@schema("crm")
+}
+
+/// 合同
+model Contract {
+  id              String    @id @default(cuid())
+  tenantId        String
+  contractNo      String    @unique
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id])
+  opportunityId   String?
+  opportunity     Opportunity? @relation(fields: [opportunityId], references: [id])
+  title           String
+  amount          Decimal   @db.Decimal(12, 2)
+  currency        String    @default("TWD")
+  signedAt        DateTime?
+  startDate       DateTime?
+  endDate         DateTime?
+  status          String    @default("draft") /// draft | pending_approval | active | completed | terminated
+  paymentTerms    String?   /// 付款条件
+  deliveryTerms   String?   /// 交付条件
+  ownerId         String
+  approvedBy      String?
+  remark          String?
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  items           ContractItem[]
+  payments        Payment[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@schema("crm")
+}
+
+/// 合同明细
+model ContractItem {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  productId  String?  /// 关联产品 (inventory.Product)
+  name       String
+  specs      String?
+  unit       String   @default("台")
+  quantity   Int
+  unitPrice  Decimal  @db.Decimal(12, 2)
+  subtotal   Decimal  @db.Decimal(12, 2)
+  remark     String?
+
+  @@schema("crm")
+}
+
+/// 安装工单
+model WorkOrder {
+  id            String    @id @default(cuid())
+  tenantId      String
+  workOrderNo   String    @unique
+  customerId    String
+  customer      Customer  @relation(fields: [customerId], references: [id])
+  contractId    String?
+  title         String
+  description   String?
+  type          String    @default("install") /// install | repair | maintain | inspect
+  priority      String    @default("normal") /// low | normal | high | urgent
+  status        String    @default("pending") /// pending | assigned | in_progress | completed | cancelled
+  scheduledDate DateTime?
+  completedDate DateTime?
+  address       String?
+  assigneeId    String?   /// 指派技术人员
+  remark        String?
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  items         WorkOrderItem[]
+  followUps     FollowUp[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([assigneeId])
+  @@schema("crm")
+}
+
+/// 工单物料（安装时使用的产品/SN码）
+model WorkOrderItem {
+  id          String    @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  productId   String    /// inventory.Product
+  snCodeId    String?   /// inventory.SnCode
+  quantity    Int       @default(1)
+  remark      String?
+
+  @@schema("crm")
+}
+
+/// 跟进记录（客户/商机/工单通用）
+model FollowUp {
+  id            String       @id @default(cuid())
+  tenantId      String
+  customerId    String?
+  customer      Customer?    @relation(fields: [customerId], references: [id])
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id])
+  workOrderId   String?
+  workOrder     WorkOrder?   @relation(fields: [workOrderId], references: [id])
+  type          String       @default("note") /// note | call | visit | email | meeting
+  content       String
+  nextAction    String?
+  nextDate      DateTime?
+  createdBy     String
+  createdAt     DateTime     @default(now())
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([opportunityId])
+  @@schema("crm")
+}
+// ============================================
+// Schema: ordering — 子公司 B2B 订货系统
+// ============================================
+
+/// 产品分类
+model ProductCategory {
+  id        String            @id @default(cuid())
+  name      String
+  slug      String            @unique
+  icon      String?
+  sortOrder Int               @default(0)
+  parentId  String?
+  parent    ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  ProductCategory[] @relation("CategoryTree")
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  products  CatalogProduct[]
+
+  @@schema("ordering")
+}
+
+/// 产品目录（总部维护）
+model CatalogProduct {
+  id          String          @id @default(cuid())
+  categoryId  String
+  category    ProductCategory @relation(fields: [categoryId], references: [id])
+  sku         String          @unique
+  name        String
+  description String?
+  images      String[]        /// MinIO URLs
+  specs       Json?           /// 规格参数 JSON
+  basePrice   Decimal         @db.Decimal(12, 2)
+  currency    String          @default("TWD")
+  moq         Int             @default(1) /// 最小起订量
+  stock       Int             @default(0) /// 可售库存
+  weight      Decimal?        @db.Decimal(8, 2) /// 重量 kg
+  isCustom    Boolean         @default(false) /// 定制产品
+  customNote  String?         /// 定制提示信息
+  status      String          @default("active") /// active | inactive | discontinued
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  prices      TenantPrice[]
+  cartItems   CartItem[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@schema("ordering")
+}
+
+/// 子公司专属价格
+model TenantPrice {
+  id        String         @id @default(cuid())
+  productId String
+  product   CatalogProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tenantId  String
+  price     Decimal        @db.Decimal(12, 2)
+  currency  String         @default("TWD")
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([productId, tenantId])
+  @@schema("ordering")
+}
+
+/// 汇率配置
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  fromCur   String   /// 源币种 e.g. CNY
+  toCur     String   /// 目标币种 e.g. TWD
+  rate      Decimal  @db.Decimal(10, 6)
+  updatedAt DateTime @updatedAt
+
+  @@unique([fromCur, toCur])
+  @@schema("ordering")
+}
+
+/// 购物车
+model CartItem {
+  id        String         @id @default(cuid())
+  tenantId  String
+  userId    String
+  productId String
+  product   CatalogProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int            @default(1)
+  remark    String?        /// 定制备注
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([tenantId, userId, productId])
+  @@index([tenantId, userId])
+  @@schema("ordering")
+}
+
+/// 子公司余额账户
+model TenantAccount {
+  id           String               @id @default(cuid())
+  tenantId     String               @unique
+  tenant       Tenant               @relation(fields: [tenantId], references: [id])
+  balance      Decimal              @db.Decimal(14, 2) @default(0)
+  creditLimit  Decimal              @db.Decimal(14, 2) @default(0) /// 信用额度
+  currency     String               @default("TWD")
+  updatedAt    DateTime             @updatedAt
+
+  transactions AccountTransaction[]
+
+  @@schema("ordering")
+}
+
+/// 账户流水
+model AccountTransaction {
+  id        String        @id @default(cuid())
+  accountId String
+  account   TenantAccount @relation(fields: [accountId], references: [id])
+  type      String        /// topup | deduct | refund | credit_adjust
+  amount    Decimal       @db.Decimal(14, 2)
+  balanceAfter Decimal    @db.Decimal(14, 2) /// 交易后余额
+  orderId   String?
+  note      String?
+  createdBy String
+  createdAt DateTime      @default(now())
+
+  @@index([accountId, createdAt])
+  @@schema("ordering")
+}
+
+/// 订单
+model Order {
+  id          String    @id @default(cuid())
+  orderNo     String    @unique
+  tenantId    String
+  totalAmount Decimal   @db.Decimal(14, 2)
+  currency    String    @default("TWD")
+  status      String    @default("pending")
+  /// pending → confirmed → processing → shipped → delivered → completed | cancelled | refunded
+  paymentMethod String  @default("balance") /// balance | online | credit
+  remark      String?
+  cancelReason String?
+  createdBy   String
+  confirmedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items       OrderItem[]
+  shipment    Shipment?
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([createdAt])
+  @@schema("ordering")
+}
+
+/// 订单明细
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  sku       String
+  name      String
+  image     String? /// 产品主图快照
+  price     Decimal @db.Decimal(12, 2)
+  quantity  Int
+  subtotal  Decimal @db.Decimal(12, 2)
+  remark    String? /// 定制备注
+
+  @@schema("ordering")
+}
+
+/// 物流
+model Shipment {
+  id          String    @id @default(cuid())
+  orderId     String    @unique
+  order       Order     @relation(fields: [orderId], references: [id])
+  carrier     String?   /// 物流公司
+  trackingNo  String?   /// 物流单号
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+  receivedAt  DateTime? /// 子公司确认收货时间
+  status      String    @default("pending")
+  /// pending → shipped → in_transit → delivered → received
+  remark      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@schema("ordering")
+}
+// ============================================
+// Schema: inventory — 进销存/仓库/SN码
+// ============================================
+
+/// 仓库
+model Warehouse {
+  id        String  @id @default(cuid())
+  tenantId  String?
+  name      String
+  code      String  @unique
+  address   String?
+  contact   String?
+  phone     String?
+  isMain    Boolean @default(false) /// 是否总仓
+  status    String  @default("active") /// active | inactive
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stocks    Stock[]
+  snCodes   SnCode[]
+
+  @@index([tenantId])
+  @@schema("inventory")
+}
+
+/// 产品档案（进销存用，与 ordering.CatalogProduct 关联但独立管理）
+model Product {
+  id          String  @id @default(cuid())
+  tenantId    String?
+  sku         String  @unique
+  name        String
+  brand       String?
+  category    String  /// curtain | lock | light | sensor | gateway | panel | other
+  unit        String  @default("台")
+  safetyStock Int     @default(0) /// 安全库存
+  specs       Json?   /// 规格参数
+  barcode     String? /// 条形码
+  status      String  @default("active") /// active | discontinued
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stocks      Stock[]
+  snCodes     SnCode[]
+
+  @@index([tenantId])
+  @@schema("inventory")
+}
+
+/// 库存（产品 × 仓库）
+model Stock {
+  id          String    @id @default(cuid())
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  quantity    Int       @default(0)
+  lockedQty   Int       @default(0) /// 锁定数量（已下单未出库）
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([productId, warehouseId])
+  @@schema("inventory")
+}
+
+/// SN 码（设备序列号，全生命周期追踪）
+model SnCode {
+  id          String    @id @default(cuid())
+  sn          String    @unique
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  warehouseId String?
+  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
+  status      String    @default("in_stock")
+  /// in_stock | allocated | shipped | installed | returned | scrapped
+  customerId  String?   /// 安装给哪个客户
+  workOrderId String?   /// 关联工单
+  installedAt DateTime?
+  warrantyEnd DateTime? /// 保修到期
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([productId])
+  @@index([warehouseId])
+  @@index([status])
+  @@schema("inventory")
+}
+
+/// 采购单
+model PurchaseOrder {
+  id          String    @id @default(cuid())
+  tenantId    String?
+  poNo        String    @unique
+  supplierId  String
+  supplier    Supplier  @relation(fields: [supplierId], references: [id])
+  warehouseId String    /// 入库仓库
+  totalAmount Decimal   @db.Decimal(14, 2)
+  currency    String    @default("TWD")
+  status      String    @default("draft")
+  /// draft → approved → ordered → partial_received → received → completed
+  expectedDate DateTime?
+  remark      String?
+  createdBy   String
+  approvedBy  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items       PurchaseOrderItem[]
+
+  @@index([tenantId])
+  @@schema("inventory")
+}
+
+/// 采购单明细
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String
+  quantity        Int
+  unitPrice       Decimal       @db.Decimal(12, 2)
+  receivedQty     Int           @default(0)
+  subtotal        Decimal       @db.Decimal(12, 2)
+
+  @@schema("inventory")
+}
+
+/// 供应商
+model Supplier {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  name      String
+  contact   String?
+  phone     String?
+  email     String?
+  address   String?
+  bankInfo  Json?    /// 银行信息
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+
+  @@index([tenantId])
+  @@schema("inventory")
+}
+
+/// 调拨单（总仓 → 子公司仓库）
+model TransferOrder {
+  id              String   @id @default(cuid())
+  transferNo      String   @unique
+  fromWarehouseId String
+  toWarehouseId   String
+  status          String   @default("pending")
+  /// pending → approved → shipping → received → completed
+  requestedBy     String   /// 申请人
+  approvedBy      String?
+  remark          String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           TransferOrderItem[]
+
+  @@schema("inventory")
+}
+
+/// 调拨单明细
+model TransferOrderItem {
+  id              String        @id @default(cuid())
+  transferOrderId String
+  transferOrder   TransferOrder @relation(fields: [transferOrderId], references: [id], onDelete: Cascade)
+  productId       String
+  quantity        Int
+  receivedQty     Int           @default(0)
+
+  @@schema("inventory")
+}
+
+/// 库存变动日志
+model StockMovement {
+  id          String   @id @default(cuid())
+  productId   String
+  warehouseId String
+  type        String   /// in | out | adjust | transfer_in | transfer_out | install
+  quantity    Int      /// 正数入库，负数出库
+  refType     String?  /// purchase | transfer | workorder | adjust | return
+  refId       String?  /// 关联单据 ID
+  snCodeId    String?
+  remark      String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  @@index([productId, warehouseId])
+  @@index([createdAt])
+  @@schema("inventory")
+}
+// ============================================
+// Schema: finance — 收款/付款/发票
+// ============================================
+
+/// 收款记录（客户付款）
+model Payment {
+  id         String    @id @default(cuid())
+  tenantId   String
+  paymentNo  String    @unique
+  contractId String
+  contract   Contract  @relation(fields: [contractId], references: [id])
+  customerId String
+  amount     Decimal   @db.Decimal(14, 2)
+  currency   String    @default("TWD")
+  paidAt     DateTime
+  method     String    /// cash | transfer | check | credit_card | online
+  status     String    @default("pending") /// pending | confirmed | refunded
+  invoiceId  String?
+  bankRef    String?   /// 银行流水号
+  note       String?
+  confirmedBy String?
+  createdBy  String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([contractId])
+  @@schema("finance")
+}
+
+/// 付款记录（给供应商）
+model Disbursement {
+  id          String    @id @default(cuid())
+  tenantId    String
+  disbNo      String    @unique
+  supplierId  String    /// inventory.Supplier ID
+  purchaseId  String?   /// 关联采购单
+  amount      Decimal   @db.Decimal(14, 2)
+  currency    String    @default("TWD")
+  paidAt      DateTime?
+  method      String    /// transfer | check | cash
+  status      String    @default("pending") /// pending | approved | paid | rejected
+  bankRef     String?
+  requestedBy String
+  approvedBy  String?
+  note        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@schema("finance")
+}
+
+/// 发票
+model Invoice {
+  id          String   @id @default(cuid())
+  tenantId    String
+  invoiceNo   String   @unique
+  type        String   /// issued | received (开出 | 收到)
+  counterpart String   /// 对方名称（客户/供应商）
+  amount      Decimal  @db.Decimal(14, 2)
+  taxRate     Decimal  @db.Decimal(5, 4) @default(0.05) /// 台湾营业税 5%
+  taxAmount   Decimal  @db.Decimal(14, 2) @default(0)
+  totalAmount Decimal  @db.Decimal(14, 2) /// 含税总额
+  issueDate   DateTime
+  dueDate     DateTime?
+  status      String   @default("draft") /// draft | issued | paid | void | overdue
+  fileUrl     String?  /// 发票扫描件 MinIO URL
+  einvoiceNo  String?  /// 台湾电子发票号（预留）
+  refType     String?  /// contract | purchase
+  refId       String?
+  note        String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, type, status])
+  @@schema("finance")
+}
+
+/// 费用报销
+model Expense {
+  id          String   @id @default(cuid())
+  tenantId    String
+  expenseNo   String   @unique
+  category    String   /// travel | office | entertainment | transport | other
+  amount      Decimal  @db.Decimal(14, 2)
+  currency    String   @default("TWD")
+  description String
+  receiptUrl  String?  /// 收据 MinIO URL
+  status      String   @default("pending") /// pending | approved | rejected | paid
+  requestedBy String
+  approvedBy  String?
+  paidAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@schema("finance")
+}
+// ============================================
+// Schema: okr — OKR/KPI/项目管理/TodoList
+// ============================================
+
+/// OKR 周期
+model OkrPeriod {
+  id        String   @id @default(cuid())
+  name      String   /// e.g. "2026 Q1"
+  type      String   /// quarterly | monthly | yearly
+  startDate DateTime
+  endDate   DateTime
+  status    String   @default("active") /// active | closed
+  createdAt DateTime @default(now())
+
+  objectives Objective[]
+
+  @@schema("okr")
+}
+
+/// 目标 (Objective)
+model Objective {
+  id          String    @id @default(cuid())
+  tenantId    String?   /// null = 公司级
+  periodId    String
+  period      OkrPeriod @relation(fields: [periodId], references: [id])
+  parentId    String?
+  parent      Objective? @relation("ObjTree", fields: [parentId], references: [id])
+  children    Objective[] @relation("ObjTree")
+  title       String
+  description String?
+  level       String    @default("company") /// company | department | individual
+  ownerId     String    /// 负责人
+  progress    Int       @default(0) /// 0-100
+  status      String    @default("on_track") /// on_track | at_risk | behind | completed
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  keyResults  KeyResult[]
+
+  @@index([tenantId])
+  @@index([periodId])
+  @@schema("okr")
+}
+
+/// 关键结果 (Key Result)
+model KeyResult {
+  id          String    @id @default(cuid())
+  objectiveId String
+  objective   Objective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  title       String
+  metric      String?   /// 自动同步指标 e.g. crm.contracts.count
+  targetValue Decimal   @db.Decimal(14, 2)
+  currentValue Decimal  @db.Decimal(14, 2) @default(0)
+  unit        String?   /// 单位: 个 | 元 | % | 台
+  progress    Int       @default(0) /// 0-100
+  ownerId     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@schema("okr")
+}
+
+/// KPI 指标定义
+model KpiDefinition {
+  id          String   @id @default(cuid())
+  name        String   @unique /// e.g. crm.contracts.count
+  displayName String
+  module      String   /// crm | ordering | inventory | finance
+  dataSource  String   /// SQL 查询或聚合规则
+  unit        String?
+  direction   String   @default("up") /// up = 越大越好, down = 越小越好
+  createdAt   DateTime @default(now())
+
+  snapshots   KpiSnapshot[]
+
+  @@schema("okr")
+}
+
+/// KPI 快照（每日自动采集）
+model KpiSnapshot {
+  id           String        @id @default(cuid())
+  definitionId String
+  definition   KpiDefinition @relation(fields: [definitionId], references: [id])
+  tenantId     String?
+  value        Decimal       @db.Decimal(14, 2)
+  date         DateTime      @db.Date
+  createdAt    DateTime      @default(now())
+
+  @@unique([definitionId, tenantId, date])
+  @@index([date])
+  @@schema("okr")
+}
+
+/// 项目
+model Project {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  status      String   @default("active") /// active | completed | archived | on_hold
+  startDate   DateTime?
+  endDate     DateTime?
+  ownerId     String
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tasks       Task[]
+
+  @@index([tenantId])
+  @@schema("okr")
+}
+
+/// 任务（看板卡片 / 甘特图条目）
+model Task {
+  id          String    @id @default(cuid())
+  tenantId    String
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id])
+  parentId    String?
+  parent      Task?     @relation("TaskTree", fields: [parentId], references: [id])
+  children    Task[]    @relation("TaskTree")
+  title       String
+  description String?
+  status      String    @default("todo") /// todo | in_progress | review | done | cancelled
+  priority    String    @default("normal") /// low | normal | high | urgent
+  assigneeId  String?
+  startDate   DateTime?
+  dueDate     DateTime?
+  completedAt DateTime?
+  estimatedHours Decimal? @db.Decimal(6, 1)
+  actualHours    Decimal? @db.Decimal(6, 1)
+  sortOrder   Int       @default(0)
+  tags        String[]
+  /// 关联其他模块
+  refType     String?   /// opportunity | workorder | customer
+  refId       String?
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([projectId, status])
+  @@index([assigneeId])
+  @@schema("okr")
+}
+
+/// 个人 TodoList
+model TodoItem {
+  id          String    @id @default(cuid())
+  tenantId    String
+  userId      String
+  title       String
+  description String?
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  dueDate     DateTime?
+  priority    String    @default("normal") /// low | normal | high
+  taskId      String?   /// 关联项目任务
+  refType     String?   /// opportunity | workorder | customer
+  refId       String?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId, completed])
+  @@index([tenantId])
+  @@schema("okr")
+}
+// ============================================
+// Schema: docs — 文档/知识库
+// ============================================
+
+/// 文档空间
+model DocSpace {
+  id          String     @id @default(cuid())
+  tenantId    String?    /// null = 全局空间
+  name        String
+  description String?
+  icon        String?
+  sortOrder   Int        @default(0)
+  createdBy   String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  documents   Document[]
+
+  @@index([tenantId])
+  @@schema("docs")
+}
+
+/// 文档
+model Document {
+  id          String     @id @default(cuid())
+  tenantId    String?
+  spaceId     String
+  space       DocSpace   @relation(fields: [spaceId], references: [id])
+  title       String
+  content     Json       /// BlockNote JSON 内容
+  icon        String?    /// 文档图标 emoji
+  coverImage  String?    /// 封面图
+  parentId    String?
+  parent      Document?  @relation("DocTree", fields: [parentId], references: [id])
+  children    Document[] @relation("DocTree")
+  sortOrder   Int        @default(0)
+  isPublished Boolean    @default(false)
+  isTemplate  Boolean    @default(false) /// 是否模板
+  visibility  String     @default("private") /// private | team | department | public
+  version     Int        @default(1)
+  wordCount   Int        @default(0)
+  createdBy   String
+  updatedBy   String
+  publishedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  mentions    DocumentMention[]
+  permissions DocumentPermission[]
+  comments    DocumentComment[]
+
+  @@index([tenantId])
+  @@index([spaceId])
+  @@schema("docs")
+}
+
+/// 文档权限
+model DocumentPermission {
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId     String?
+  roleId     String?
+  deptId     String?
+  level      String   /// view | comment | edit | admin
+  createdAt  DateTime @default(now())
+
+  @@unique([documentId, userId])
+  @@schema("docs")
+}
+
+/// 文档跨模块引用（Mention）
+model DocumentMention {
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  module     String   /// customers | workorders | products | docs | users | opportunities
+  targetId   String
+  label      String?  /// 显示文本快照
+  createdAt  DateTime @default(now())
+
+  @@unique([documentId, module, targetId])
+  @@schema("docs")
+}
+
+/// 文档评论
+model DocumentComment {
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  parentId   String?  /// 回复某条评论
+  content    String
+  createdBy  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([documentId])
+  @@schema("docs")
+}
+// ============================================
+// Schema: lms — 培训/课程/考试/证书
+// ============================================
+
+/// 课程分类
+model CourseCategory {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  icon      String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  courses   Course[]
+
+  @@schema("lms")
+}
+
+/// 课程
+model Course {
+  id           String          @id @default(cuid())
+  tenantId     String?         /// null = 总部课程（全局可见）
+  categoryId   String
+  category     CourseCategory  @relation(fields: [categoryId], references: [id])
+  title        String
+  description  String?
+  coverImage   String?
+  difficulty   String          @default("beginner") /// beginner | intermediate | advanced
+  duration     Int?            /// 预计学习时长（分钟）
+  passingScore Int             @default(60)
+  status       String          @default("draft") /// draft | review | published | archived
+  publishedAt  DateTime?
+  createdBy    String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  chapters     Chapter[]
+  assignments  CourseAssignment[]
+  certificates Certificate[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@schema("lms")
+}
+
+/// 章节
+model Chapter {
+  id        String  @id @default(cuid())
+  courseId   String
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title     String
+  content   Json    /// BlockNote JSON
+  videoUrl  String? /// 视频 MinIO URL
+  duration  Int?    /// 视频时长（秒）
+  sortOrder Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  quiz      Quiz?
+  progress  LearningProgress[]
+
+  @@schema("lms")
+}
+
+/// 课程指派
+model CourseAssignment {
+  id        String    @id @default(cuid())
+  courseId   String
+  course    Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  tenantId  String?   /// 指派给整个子公司
+  roleId    String?   /// 指派给某角色
+  userId    String?   /// 指派给个人
+  dueDate   DateTime?
+  assignedBy String
+  createdAt DateTime  @default(now())
+
+  @@schema("lms")
+}
+
+/// 学习进度
+model LearningProgress {
+  id            String   @id @default(cuid())
+  userId        String
+  courseId       String
+  chapterId     String
+  chapter       Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  completed     Boolean  @default(false)
+  videoProgress Int      @default(0) /// 视频观看进度（秒）
+  completedAt   DateTime?
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, chapterId])
+  @@index([userId, courseId])
+  @@schema("lms")
+}
+
+/// 测验
+model Quiz {
+  id        String     @id @default(cuid())
+  chapterId String?    @unique
+  chapter   Chapter?   @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  courseId   String?    /// 课程级测验（期末考）
+  title     String
+  timeLimit Int?       /// 限时（分钟）
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  questions Question[]
+  attempts  QuizAttempt[]
+
+  @@schema("lms")
+}
+
+/// 题目
+model Question {
+  id        String @id @default(cuid())
+  quizId    String
+  quiz      Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  type      String /// single | multiple | boolean | text
+  content   String
+  options   Json?  /// 选项 [{label, value}]
+  answer    Json   /// 正确答案
+  score     Int    @default(10)
+  sortOrder Int    @default(0)
+  explanation String? /// 答案解析
+
+  @@schema("lms")
+}
+
+/// 考试记录
+model QuizAttempt {
+  id        String   @id @default(cuid())
+  quizId    String
+  quiz      Quiz     @relation(fields: [quizId], references: [id])
+  userId    String
+  answers   Json     /// 用户答案
+  score     Int
+  maxScore  Int
+  passed    Boolean
+  duration  Int?     /// 用时（秒）
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@schema("lms")
+}
+
+/// 证书
+model Certificate {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId   String
+  course    Course   @relation(fields: [courseId], references: [id])
+  certNo    String   @unique /// 证书编号
+  score     Int
+  issuedAt  DateTime @default(now())
+  pdfUrl    String?  /// PDF MinIO URL
+  expiresAt DateTime? /// 有效期
+
+  @@unique([userId, courseId])
+  @@schema("lms")
 }

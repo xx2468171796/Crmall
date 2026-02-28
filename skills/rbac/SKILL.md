@@ -1,224 +1,91 @@
----
-name: rbac
-description: 角色权限控制技能。在需要实现权限检查、菜单授权、路由守卫、数据范围控制等功能时使用此技能。基于 Directus RBAC + Auth.js Session + 中间件守卫。
----
-
-# 角色权限技能 (RBAC Skill)
-
-实现权限控制相关功能时，遵循以下流程和规范。
+# RBAC 技能 — 角色权限控制
 
 ## 技术栈
+- 自建 RBAC（不用 Directus/Clerk）
+- Auth.js v5 Session
+- Prisma 7 权限模型
+- Next.js Middleware + Server Action 双重校验
 
-- **Directus** - 权限引擎 (定义角色和权限)
-- **Auth.js v5** - Session 中的用户角色
-- **Next.js Middleware** - 路由守卫
-- **React Hook** - 前端权限检查
+## 角色层级
 
-## 角色定义
-
-系统预设四个角色层级：
-
-| 角色 | 代码 | 权限范围 |
-|------|------|----------|
-| 超级管理员 | `super_admin` | 所有权限 |
-| 管理员 | `admin` | 管理本组织 |
-| 经理 | `manager` | 管理下属 |
-| 普通用户 | `user` | 仅自己数据 |
+| 角色 | 数据范围 | 说明 |
+|------|----------|------|
+| platform_admin | 所有租户 | 总部超级管理员 |
+| platform_viewer | 所有租户（只读） | 总部查看者 |
+| tenant_admin | 本租户 | 子公司管理员 |
+| tenant_manager | 本租户 | 子公司经理 |
+| tenant_user | 本租户 | 子公司普通员工 |
 
 ## 权限格式
 
-权限使用 `resource:action` 格式：
+`{module}:{action}`
 
+示例：
+- customer:read / customer:write / customer:delete
+- order:create / order:approve / order:ship
+- workorder:assign / workorder:complete
+- doc:read / doc:edit / doc:admin
+- platform:manage (总部专属)
+
+## 权限检查方式
+
+### Server Action 中
 ```typescript
-type Permission = 
-  | "customer:create"
-  | "customer:read"
-  | "customer:update"
-  | "customer:delete"
-  | "order:create"
-  | "order:read"
-  // ...
+import { auth } from '@twcrm/auth'
+import { checkPermission } from '@twcrm/rbac'
+
+export async function createOrderAction(input: CreateOrderDTO) {
+  const session = await auth()
+  if (!session) return fail('未登入', 'UNAUTHORIZED')
+  
+  checkPermission(session.user, 'order:create')
+  // 业务逻辑...
+}
 ```
 
-## 权限检查 Hook
-
+### React 组件中
 ```typescript
-// src/hooks/usePermission.ts
-"use client"
+import { usePermission } from '@/hooks/use-permission'
 
-import { useSession } from "next-auth/react"
-
-export function usePermission() {
-  const { data: session } = useSession()
+function OrderActions() {
+  const { can } = usePermission()
   
-  const hasPermission = (permission: string): boolean => {
-    if (!session?.user?.permissions) return false
-    return session.user.permissions.includes(permission)
-  }
-  
-  const hasRole = (role: string): boolean => {
-    if (!session?.user?.role) return false
-    return session.user.role === role
-  }
-  
-  const hasAnyRole = (roles: string[]): boolean => {
-    if (!session?.user?.role) return false
-    return roles.includes(session.user.role)
-  }
-  
-  return { hasPermission, hasRole, hasAnyRole }
+  return (
+    <>
+      {can('order:create') && <CreateOrderButton />}
+      {can('order:approve') && <ApproveButton />}
+    </>
+  )
 }
 ```
 
-## 权限检查组件
-
-```tsx
-// src/components/shared/permission-gate.tsx
-"use client"
-
-import { usePermission } from "@/hooks/usePermission"
-
-interface PermissionGateProps {
-  permission: string
-  children: React.ReactNode
-  fallback?: React.ReactNode
-}
-
-export function PermissionGate({ permission, children, fallback }: PermissionGateProps) {
-  const { hasPermission } = usePermission()
-  
-  if (!hasPermission(permission)) {
-    return fallback ?? null
-  }
-  
-  return <>{children}</>
-}
-```
-
-使用示例：
-
-```tsx
-<PermissionGate permission="customer:delete">
-  <Button variant="destructive">删除客户</Button>
-</PermissionGate>
-```
-
-## 路由守卫中间件
-
+### Next.js Middleware
 ```typescript
 // src/middleware.ts
-import { auth } from "@/lib/auth"
-import { NextResponse } from "next/server"
-
-const protectedRoutes = ["/dashboard", "/customers", "/orders"]
-const adminRoutes = ["/admin", "/settings"]
-
 export default auth((req) => {
   const { pathname } = req.nextUrl
-  const session = req.auth
-  
-  // 未登录访问受保护路由
-  if (protectedRoutes.some(r => pathname.startsWith(r))) {
-    if (!session) {
-      return NextResponse.redirect(new URL("/login", req.url))
-    }
+  const user = req.auth?.user
+
+  // 总部路由只有 platform 角色可访问
+  if (pathname.startsWith('/platform') && !isPlatformRole(user?.role)) {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
   }
-  
-  // 非管理员访问管理路由
-  if (adminRoutes.some(r => pathname.startsWith(r))) {
-    if (session?.user?.role !== "admin" && session?.user?.role !== "super_admin") {
-      return NextResponse.redirect(new URL("/403", req.url))
-    }
-  }
-  
-  return NextResponse.next()
 })
-
-export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
-}
 ```
 
-## Server Action 权限检查
+## 多租户数据隔离
+
+- 子公司用户：自动注入 WHERE tenantId = ?
+- 总部用户：不注入 tenantId，可查全部
+- 通过 Prisma Middleware 实现，不需要手动写
+
+## 菜单权限过滤
+
+导航菜单根据用户角色/权限动态过滤：
 
 ```typescript
-// src/actions/customer/delete.ts
-"use server"
-
-import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/db"
-
-export async function deleteCustomer(id: string) {
-  const session = await auth()
-  
-  if (!session?.user) {
-    throw new Error("Unauthorized")
-  }
-  
-  if (!session.user.permissions?.includes("customer:delete")) {
-    throw new Error("Forbidden: 无删除权限")
-  }
-  
-  await prisma.customer.update({
-    where: { id },
-    data: { deletedAt: new Date() },
-  })
-  
-  return { success: true }
-}
-```
-
-## 动态菜单渲染
-
-```typescript
-// src/lib/menu.ts
-import { Session } from "next-auth"
-
-interface MenuItem {
-  label: string
-  href: string
-  permission?: string
-  icon: string
-}
-
-const allMenuItems: MenuItem[] = [
-  { label: "仪表板", href: "/dashboard", icon: "LayoutDashboard" },
-  { label: "客户管理", href: "/customers", permission: "customer:read", icon: "Users" },
-  { label: "订单管理", href: "/orders", permission: "order:read", icon: "ShoppingCart" },
-  { label: "系统设置", href: "/admin", permission: "admin:access", icon: "Settings" },
-]
-
-export function getMenuItems(session: Session | null): MenuItem[] {
-  if (!session?.user) return []
-  
-  return allMenuItems.filter(item => {
-    if (!item.permission) return true
-    return session.user.permissions?.includes(item.permission)
-  })
-}
-```
-
-## 数据范围控制
-
-```typescript
-// src/lib/db/scope.ts
-import { Session } from "next-auth"
-import { Prisma } from "@prisma/client"
-
-export function getDataScope(session: Session): Prisma.CustomerWhereInput {
-  const role = session.user.role
-  const userId = session.user.id
-  const orgId = session.user.organizationId
-  
-  switch (role) {
-    case "super_admin":
-      return {} // 所有数据
-    case "admin":
-      return { organizationId: orgId } // 本组织
-    case "manager":
-      return { OR: [{ ownerId: userId }, { owner: { managerId: userId } }] } // 自己和下属
-    default:
-      return { ownerId: userId } // 仅自己
-  }
-}
+const menuItems = allMenuItems.filter(item => {
+  if (!item.requiredPermission) return true
+  return can(item.requiredPermission)
+})
 ```
