@@ -10,6 +10,9 @@ import { prisma } from '@twcrm/db'
 import type { SessionUser } from '@twcrm/shared'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
+  debug: process.env.NODE_ENV === 'development',
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   providers: [
     Credentials({
       credentials: {
@@ -17,65 +20,70 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null
+        try {
+          if (!credentials?.email || !credentials?.password) return null
 
-        const email = credentials.email as string
-        const password = credentials.password as string
+          const email = credentials.email as string
+          const password = credentials.password as string
 
-        const user = await prisma.user.findUnique({
-          where: { email },
-          include: {
-            tenant: true,
-            roles: {
-              include: {
-                role: {
-                  include: {
-                    permissions: {
-                      include: { permission: true },
+          const user = await prisma.user.findUnique({
+            where: { email },
+            include: {
+              tenant: true,
+              roles: {
+                include: {
+                  role: {
+                    include: {
+                      permissions: {
+                        include: { permission: true },
+                      },
                     },
                   },
                 },
               },
             },
-          },
-        })
+          })
 
-        if (!user || user.status !== 'active') return null
+          if (!user || user.status !== 'active') return null
 
-        const isValid = await compare(password, user.passwordHash)
-        if (!isValid) return null
+          const isValid = await compare(password, user.passwordHash)
+          if (!isValid) return null
 
-        // 更新最后登录时间
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { lastLoginAt: new Date() },
-        })
+          // 更新最后登录时间
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { lastLoginAt: new Date() },
+          })
 
-        // 构建权限码: module:action:resource
-        const roles = user.roles.map((ur) => ur.role.name)
-        const permissions = [
-          ...new Set(
-            user.roles.flatMap((ur) =>
-              ur.role.permissions.map(
-                (rp) => `${rp.permission.module}:${rp.permission.action}:${rp.permission.resource}`
+          // 构建权限码: module:action:resource
+          const roles = user.roles.map((ur) => ur.role.name)
+          const permissions = [
+            ...new Set(
+              user.roles.flatMap((ur) =>
+                ur.role.permissions.map(
+                  (rp) => `${rp.permission.module}:${rp.permission.action}:${rp.permission.resource}`
+                )
               )
-            )
-          ),
-        ]
-        const isPlatform = user.tenant.parentId === null
+            ),
+          ]
+          const isPlatform = user.tenant.parentId === null
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.avatar,
-          tenantId: user.tenantId,
-          tenantCode: user.tenant.code,
-          tenantName: user.tenant.name,
-          roles,
-          permissions,
-          locale: user.locale,
-          isPlatform,
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.avatar,
+            tenantId: user.tenantId,
+            tenantCode: user.tenant.code,
+            tenantName: user.tenant.name,
+            roles,
+            permissions,
+            locale: user.locale,
+            isPlatform,
+          }
+        } catch (error) {
+          console.error('[AUTH] authorize error:', error)
+          return null
         }
       },
     }),

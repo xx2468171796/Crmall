@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "stable-browser": {
+      "url": "http://localhost:3211/mcp"
+    },
+    "database": {
+      "url": "http://localhost:3212/mcp"
+    }
+  }
+}

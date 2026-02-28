@@ -125,15 +125,16 @@ async function main() {
   console.log(`✅ 创建 ${subsidiaries.length} 个子公司`)
 
   // 4. 创建超级管理员
-  // 密码: xx123654 (bcrypt hash)
+  // 密码: Admin@123456 (bcrypt hash)
+  const passwordHash = '$2b$10$.PwLX5.FFSESHa6P60fXGen82v/7Gbo8eYGdG7JhgvLKpe5pLsAva'
   const admin = await prisma.user.upsert({
     where: { email: 'admin@twcrm.com' },
-    update: {},
+    update: { passwordHash },
     create: {
       tenantId: hq.id,
       email: 'admin@twcrm.com',
       name: '系统管理员',
-      passwordHash: '$2b$10$7l7LQufmhc.p3x1qydHrfeqdyWekJ8deqiAYA6smB25Ke6nZw404y',
+      passwordHash,
       locale: 'zh-CN',
       status: 'active',
     },
