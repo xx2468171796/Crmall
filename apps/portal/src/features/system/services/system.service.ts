@@ -73,11 +73,11 @@ export class NotificationService implements INotificationService {
     await this.notificationRepo.markAllRead(userId)
   }
 
-  async send(data: any): Promise<void> {
-    const wsEnabled = await this.configService.getBoolean('notification', 'ws_enabled', data.tenantId, true)
+  async send(data: { userId: string; tenantId?: string; title: string; content?: string; type: string; module?: string; refType?: string; refId?: string }): Promise<void> {
+    const _wsEnabled = await this.configService.getBoolean('notification', 'ws_enabled', data.tenantId, true)
     // 创建数据库记录
     await this.notificationRepo.create(data)
-    // TODO: 如果 wsEnabled，通过 WebSocket 推送
+    // TODO: 如果 _wsEnabled，通过 WebSocket 推送
   }
 }
 

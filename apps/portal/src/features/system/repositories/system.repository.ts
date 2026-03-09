@@ -11,6 +11,59 @@ import type {
   ConfigItemVO, UpdateConfigDTO,
 } from '../types/system.types'
 
+// ---- Row types for Prisma query results ----
+
+interface AnnouncementRow {
+  id: string
+  title: string
+  content: string
+  type: string
+  priority: number
+  isTop: boolean
+  targetType: string
+  targetIds: string[]
+  publishedAt: Date | null
+  expiresAt: Date | null
+  status: string
+  createdBy: string
+  createdAt: Date
+  reads?: Array<{ id: string }>
+}
+
+interface NotificationRow {
+  id: string
+  title: string
+  content: string | null
+  type: string
+  module: string | null
+  refType: string | null
+  refId: string | null
+  isRead: boolean
+  readAt: Date | null
+  createdAt: Date
+}
+
+interface CreateNotificationData {
+  userId: string
+  tenantId?: string
+  title: string
+  content?: string
+  type: string
+  module?: string
+  refType?: string
+  refId?: string
+}
+
+interface ConfigRow {
+  id: string
+  tenantId: string | null
+  group: string
+  key: string
+  value: string
+  label: string | null
+  updatedAt: Date
+}
+
 // ---- 公告 ----
 
 export class AnnouncementRepository implements IAnnouncementRepository {
@@ -20,7 +73,7 @@ export class AnnouncementRepository implements IAnnouncementRepository {
     const page = filters.page ?? 1
     const perPage = filters.perPage ?? 20
     const now = new Date()
-    const where: any = {
+    const where: Record<string, unknown> = {
       status: 'published',
       publishedAt: { lte: now },
       OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
@@ -39,7 +92,7 @@ export class AnnouncementRepository implements IAnnouncementRepository {
     ])
 
     return {
-      items: items.map((a) => this.toVO(a, userId)),
+      items: items.map((a) => this.toVO(a as unknown as AnnouncementRow, userId)),
       total, page, perPage,
       totalPages: Math.ceil(total / perPage),
     }
@@ -48,7 +101,7 @@ export class AnnouncementRepository implements IAnnouncementRepository {
   async findAll(filters: AnnouncementFilters): Promise<PaginatedResult<AnnouncementVO>> {
     const page = filters.page ?? 1
     const perPage = filters.perPage ?? 20
-    const where: any = {}
+    const where: Record<string, unknown> = {}
     if (filters.status) where.status = filters.status
     if (filters.type) where.type = filters.type
 
@@ -63,7 +116,7 @@ export class AnnouncementRepository implements IAnnouncementRepository {
     ])
 
     return {
-      items: items.map((a) => this.toVO(a)),
+      items: items.map((a) => this.toVO(a as unknown as AnnouncementRow)),
       total, page, perPage,
       totalPages: Math.ceil(total / perPage),
     }
@@ -71,14 +124,14 @@ export class AnnouncementRepository implements IAnnouncementRepository {
 
   async findById(id: string): Promise<AnnouncementVO | null> {
     const a = await this.prisma.announcement.findUnique({ where: { id } })
-    return a ? this.toVO(a) : null
+    return a ? this.toVO(a as unknown as AnnouncementRow) : null
   }
 
   async create(dto: CreateAnnouncementDTO, createdBy: string): Promise<AnnouncementVO> {
     const a = await this.prisma.announcement.create({
       data: { ...dto, createdBy },
     })
-    return this.toVO(a)
+    return this.toVO(a as unknown as AnnouncementRow)
   }
 
   async publish(id: string): Promise<void> {
@@ -103,7 +156,7 @@ export class AnnouncementRepository implements IAnnouncementRepository {
     })
   }
 
-  private toVO(a: any, _userId?: string): AnnouncementVO {
+  private toVO(a: AnnouncementRow, _userId?: string): AnnouncementVO {
     return {
       id: a.id, title: a.title, content: a.content, type: a.type,
       priority: a.priority, isTop: a.isTop, targetType: a.targetType,
@@ -125,7 +178,7 @@ export class NotificationRepository implements INotificationRepository {
   async findByUser(userId: string, filters: NotificationFilters): Promise<PaginatedResult<NotificationVO>> {
     const page = filters.page ?? 1
     const perPage = filters.perPage ?? 20
-    const where: any = { userId }
+    const where: Record<string, unknown> = { userId }
     if (filters.isRead !== undefined) where.isRead = filters.isRead
     if (filters.type) where.type = filters.type
 
@@ -140,7 +193,7 @@ export class NotificationRepository implements INotificationRepository {
     ])
 
     return {
-      items: items.map(this.toVO),
+      items: items.map((n) => this.toVO(n as unknown as NotificationRow)),
       total, page, perPage,
       totalPages: Math.ceil(total / perPage),
     }
@@ -164,12 +217,12 @@ export class NotificationRepository implements INotificationRepository {
     })
   }
 
-  async create(data: any): Promise<NotificationVO> {
+  async create(data: CreateNotificationData): Promise<NotificationVO> {
     const n = await this.prisma.notification.create({ data })
-    return this.toVO(n)
+    return this.toVO(n as unknown as NotificationRow)
   }
 
-  private toVO(n: any): NotificationVO {
+  private toVO(n: NotificationRow): NotificationVO {
     return {
       id: n.id, title: n.title, content: n.content, type: n.type,
       module: n.module, refType: n.refType, refId: n.refId,
@@ -189,7 +242,7 @@ export class ConfigRepository implements IConfigRepository {
       ? { group, OR: [{ tenantId: null }, { tenantId }] }
       : { group, tenantId: null }
     const items = await this.prisma.systemConfig.findMany({ where, orderBy: { key: 'asc' } })
-    return items.map(this.toVO)
+    return items.map((c) => this.toVO(c as unknown as ConfigRow))
   }
 
   async findAllGroups(): Promise<string[]> {
@@ -209,7 +262,7 @@ export class ConfigRepository implements IConfigRepository {
       update: { value: dto.value, label: dto.label },
       create: { tenantId: tid || null, group: dto.group, key: dto.key, value: dto.value, label: dto.label },
     })
-    return this.toVO(item)
+    return this.toVO(item as unknown as ConfigRow)
   }
 
   async deleteByKey(group: string, key: string, tenantId?: string): Promise<void> {
@@ -219,7 +272,7 @@ export class ConfigRepository implements IConfigRepository {
     })
   }
 
-  private toVO(c: any): ConfigItemVO {
+  private toVO(c: ConfigRow): ConfigItemVO {
     return {
       id: c.id, tenantId: c.tenantId, group: c.group,
       key: c.key, value: c.value, label: c.label,
