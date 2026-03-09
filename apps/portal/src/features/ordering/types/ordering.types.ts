@@ -2,6 +2,21 @@
 // B2B 订货模块 — 类型定义
 // ============================================
 
+// ---- 产品变体 ----
+
+export interface ProductVariantVO {
+  id: string
+  sku: string
+  name: string | null
+  images: string[]
+  basePrice: number | null  // null 时用 SPU 的
+  stock: number
+  moq: number | null        // null 时用 SPU 的
+  status: string
+  attributes: Record<string, string>  // {"颜色":"白色","版本":"Zigbee"}
+  tenantPrice: number | null
+}
+
 // ---- 产品目录 ----
 
 export interface CatalogProductVO {
@@ -11,8 +26,10 @@ export interface CatalogProductVO {
   description: string | null
   images: string[]
   specs: Record<string, unknown> | null
+  brand: string | null
+  unit: string
   basePrice: number
-  tenantPrice: number | null // 子公司专属价格
+  tenantPrice: number | null // 子公司专属价格（SPU 级）
   currency: string
   moq: number
   stock: number
@@ -21,6 +38,7 @@ export interface CatalogProductVO {
   status: string
   categoryId: string
   categoryName: string
+  variants: ProductVariantVO[]
 }
 
 export interface CatalogFilters {
@@ -39,6 +57,10 @@ export interface CartItemVO {
   productName: string
   productSku: string
   productImage: string | null
+  variantId: string
+  variantName: string | null
+  variantSku: string
+  specs: Record<string, string> | null
   price: number
   quantity: number
   subtotal: number
@@ -49,6 +71,7 @@ export interface CartItemVO {
 
 export interface AddToCartDTO {
   productId: string
+  variantId: string  // 必须指定变体
   quantity: number
   remark?: string
 }
@@ -86,9 +109,12 @@ export interface OrderVO {
 export interface OrderItemVO {
   id: string
   productId: string
+  variantId: string | null
   sku: string
   name: string
+  variantName: string | null
   image: string | null
+  specs: Record<string, string> | null
   price: number
   quantity: number
   subtotal: number

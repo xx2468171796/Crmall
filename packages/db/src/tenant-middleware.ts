@@ -78,7 +78,7 @@ export function withTenant(
           }
           return query(args)
         },
-        async findUnique({ model, args, query }) {
+        async findUnique({ args, query }) {
           // findUnique 使用唯一字段定位，无法直接添加 tenantId 到 where
           // 数据安全由 Repository 层的手动 tenantId 检查保障
           return query(args)
@@ -91,7 +91,8 @@ export function withTenant(
         },
         async create({ model, args, query }) {
           if (isTenantModel(model)) {
-            args.data = { ...args.data, tenantId }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma union types require cast
+            args.data = { ...(args.data as Record<string, unknown>), tenantId } as typeof args.data
           }
           return query(args)
         },

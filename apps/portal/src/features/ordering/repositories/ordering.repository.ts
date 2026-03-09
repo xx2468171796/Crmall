@@ -9,7 +9,7 @@ import type {
   IAccountRepository,
 } from './ordering.repository.interface'
 import type {
-  CatalogProductVO, CatalogFilters,
+  CatalogProductVO, CatalogFilters, ProductVariantVO,
   CartItemVO, AddToCartDTO, UpdateCartDTO,
   OrderVO, OrderFilters,
   TenantAccountVO,
@@ -17,13 +17,36 @@ import type {
 
 // ---- Row types for Prisma query results ----
 
+interface VariantAttributeValueRow {
+  attributeValue: {
+    value: string
+    attribute: { name: string }
+  }
+}
+
+interface VariantRow {
+  id: string
+  sku: string
+  name: string | null
+  images: string[]
+  basePrice: { toNumber(): number } | number | null
+  stock: number
+  moq: number | null
+  status: string
+  sortOrder: number
+  attributeValues: VariantAttributeValueRow[]
+  tenantPrices?: Array<{ tenantId: string; price: { toNumber(): number } | number }>
+}
+
 interface CatalogProductRow {
   id: string
   sku: string
   name: string
+  brand: string | null
   description: string | null
   images: string[]
   specs: unknown
+  unit: string
   basePrice: { toNumber(): number } | number
   currency: string
   moq: number
@@ -34,12 +57,14 @@ interface CatalogProductRow {
   sortOrder: number
   categoryId: string
   category: { name: string }
-  prices?: Array<{ tenantId: string; price: { toNumber(): number } | number }>
+  variants: VariantRow[]
+  prices?: Array<{ variantId: string | null; tenantId: string; price: { toNumber(): number } | number }>
 }
 
 interface CartItemRow {
   id: string
   productId: string
+  variantId: string
   product: {
     name: string
     sku: string
@@ -48,6 +73,16 @@ interface CartItemRow {
     moq: number
     stock: number
   }
+  variant: {
+    sku: string
+    name: string | null
+    images: string[]
+    basePrice: { toNumber(): number } | number | null
+    stock: number
+    moq: number | null
+    attributeValues: VariantAttributeValueRow[]
+    tenantPrices?: Array<{ price: { toNumber(): number } | number }>
+  }
   quantity: number
   remark: string | null
 }
@@ -55,9 +90,12 @@ interface CartItemRow {
 interface OrderItemRow {
   id: string
   productId: string
+  variantId: string | null
   sku: string
   name: string
+  variantName: string | null
   image: string | null
+  specs: unknown
   price: { toNumber(): number } | number
   quantity: number
   subtotal: { toNumber(): number } | number
@@ -105,9 +143,12 @@ interface CreateOrderData {
   createdBy: string
   items: Array<{
     productId: string
+    variantId?: string
     sku: string
     name: string
+    variantName?: string
     image?: string
+    specs?: Record<string, string>
     price: number
     quantity: number
     subtotal: number
@@ -117,6 +158,13 @@ interface CreateOrderData {
 
 interface OrderQueryFilters extends OrderFilters {
   tenantId?: string
+}
+
+// ---- 辅助: Decimal → number ----
+
+function toNum(val: { toNumber(): number } | number | null | undefined): number | null {
+  if (val == null) return null
+  return typeof val === 'number' ? val : val.toNumber()
 }
 
 // ---- 产品目录 ----
@@ -145,6 +193,18 @@ export class CatalogRepository implements ICatalogRepository {
         include: {
           category: true,
           prices: { where: { tenantId } },
+          variants: {
+            where: { status: 'active' },
+            orderBy: { sortOrder: 'asc' },
+            include: {
+              attributeValues: {
+                include: {
+                  attributeValue: { include: { attribute: true } },
+                },
+              },
+              tenantPrices: { where: { tenantId } },
+            },
+          },
         },
       }),
       this.prisma.catalogProduct.count({ where }),
@@ -165,13 +225,26 @@ export class CatalogRepository implements ICatalogRepository {
       include: {
         category: true,
         prices: { where: { tenantId } },
+        variants: {
+          where: { status: 'active' },
+          orderBy: { sortOrder: 'asc' },
+          include: {
+            attributeValues: {
+              include: {
+                attributeValue: { include: { attribute: true } },
+              },
+            },
+            tenantPrices: { where: { tenantId } },
+          },
+        },
       },
     })
     return p ? this.toVO(p as unknown as CatalogProductRow, tenantId) : null
   }
 
   private toVO(p: CatalogProductRow, _tenantId: string): CatalogProductVO {
-    const tenantPrice = p.prices?.[0]?.price
+    // SPU 级租户价格 (variantId 为 null)
+    const spuTenantPrice = p.prices?.find((tp) => tp.variantId === null)
     return {
       id: p.id,
       sku: p.sku,
@@ -179,8 +252,10 @@ export class CatalogRepository implements ICatalogRepository {
       description: p.description,
       images: p.images ?? [],
       specs: p.specs as Record<string, unknown> | null,
+      brand: p.brand,
+      unit: p.unit,
       basePrice: Number(p.basePrice),
-      tenantPrice: tenantPrice ? Number(tenantPrice) : null,
+      tenantPrice: spuTenantPrice ? Number(spuTenantPrice.price) : null,
       currency: p.currency,
       moq: p.moq,
       stock: p.stock,
@@ -189,6 +264,41 @@ export class CatalogRepository implements ICatalogRepository {
       status: p.status,
       categoryId: p.categoryId,
       categoryName: p.category?.name ?? '',
+      variants: (p.variants ?? []).map((v) => this.toVariantVO(v, p)),
+    }
+  }
+
+  /** 变体 VO 映射，含 4 级价格解析 */
+  private toVariantVO(v: VariantRow, p: CatalogProductRow): ProductVariantVO {
+    // 属性映射: { "颜色": "白色", "版本": "Zigbee" }
+    const attributes: Record<string, string> = {}
+    for (const av of v.attributeValues ?? []) {
+      attributes[av.attributeValue.attribute.name] = av.attributeValue.value
+    }
+
+    // 4 级价格: variantTenantPrice > spuTenantPrice > variantBasePrice > spuBasePrice
+    const variantTenantPrice = v.tenantPrices?.[0]?.price
+    const spuTenantPrice = p.prices?.find((tp) => tp.variantId === null)?.price
+    const variantBasePrice = v.basePrice
+
+    let resolvedTenantPrice: number | null = null
+    if (variantTenantPrice != null) {
+      resolvedTenantPrice = Number(variantTenantPrice)
+    } else if (spuTenantPrice != null) {
+      resolvedTenantPrice = Number(spuTenantPrice)
+    }
+
+    return {
+      id: v.id,
+      sku: v.sku,
+      name: v.name,
+      images: v.images ?? [],
+      basePrice: toNum(variantBasePrice),
+      stock: v.stock,
+      moq: v.moq,
+      status: v.status,
+      attributes,
+      tenantPrice: resolvedTenantPrice,
     }
   }
 }
@@ -198,10 +308,24 @@ export class CatalogRepository implements ICatalogRepository {
 export class CartRepository implements ICartRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
+  private static readonly cartInclude = {
+    product: true,
+    variant: {
+      include: {
+        attributeValues: {
+          include: {
+            attributeValue: { include: { attribute: true } },
+          },
+        },
+        tenantPrices: true,
+      },
+    },
+  } as const
+
   async findByUser(tenantId: string, userId: string): Promise<CartItemVO[]> {
     const items = await this.prisma.cartItem.findMany({
       where: { tenantId, userId },
-      include: { product: true },
+      include: CartRepository.cartInclude,
       orderBy: { createdAt: 'desc' },
     })
     return items.map((i) => this.toVO(i as unknown as CartItemRow))
@@ -209,10 +333,17 @@ export class CartRepository implements ICartRepository {
 
   async addItem(tenantId: string, userId: string, dto: AddToCartDTO, _price: number): Promise<CartItemVO> {
     const item = await this.prisma.cartItem.upsert({
-      where: { tenantId_userId_productId: { tenantId, userId, productId: dto.productId } },
+      where: { tenantId_userId_variantId: { tenantId, userId, variantId: dto.variantId } },
       update: { quantity: { increment: dto.quantity }, remark: dto.remark },
-      create: { tenantId, userId, productId: dto.productId, quantity: dto.quantity, remark: dto.remark },
-      include: { product: true },
+      create: {
+        tenantId,
+        userId,
+        productId: dto.productId,
+        variantId: dto.variantId,
+        quantity: dto.quantity,
+        remark: dto.remark,
+      },
+      include: CartRepository.cartInclude,
     })
     return this.toVO(item as unknown as CartItemRow)
   }
@@ -221,7 +352,7 @@ export class CartRepository implements ICartRepository {
     const item = await this.prisma.cartItem.update({
       where: { id },
       data: { quantity: dto.quantity, remark: dto.remark },
-      include: { product: true },
+      include: CartRepository.cartInclude,
     })
     return this.toVO(item as unknown as CartItemRow)
   }
@@ -235,17 +366,45 @@ export class CartRepository implements ICartRepository {
   }
 
   private toVO(i: CartItemRow): CartItemVO {
+    // 属性映射
+    const specs: Record<string, string> = {}
+    for (const av of i.variant.attributeValues ?? []) {
+      specs[av.attributeValue.attribute.name] = av.attributeValue.value
+    }
+
+    // 4 级价格: variantTenantPrice > spuTenantPrice(N/A in cart) > variantBasePrice > spuBasePrice
+    // 购物车中只有 variant.tenantPrices 和 variant.basePrice、product.basePrice 可用
+    const variantTenantPrice = i.variant.tenantPrices?.[0]?.price
+    const variantBasePrice = i.variant.basePrice
+    const spuBasePrice = i.product.basePrice
+
+    let price: number
+    if (variantTenantPrice != null) {
+      price = Number(variantTenantPrice)
+    } else if (variantBasePrice != null) {
+      price = Number(variantBasePrice)
+    } else {
+      price = Number(spuBasePrice)
+    }
+
+    // MOQ: 变体级 > SPU 级
+    const moq = i.variant.moq ?? i.product.moq
+
     return {
       id: i.id,
       productId: i.productId,
       productName: i.product.name,
       productSku: i.product.sku,
       productImage: i.product.images?.[0] ?? null,
-      price: Number(i.product.basePrice),
+      variantId: i.variantId,
+      variantName: i.variant.name,
+      variantSku: i.variant.sku,
+      specs: Object.keys(specs).length > 0 ? specs : null,
+      price,
       quantity: i.quantity,
-      subtotal: Number(i.product.basePrice) * i.quantity,
-      moq: i.product.moq,
-      stock: i.product.stock,
+      subtotal: price * i.quantity,
+      moq,
+      stock: i.variant.stock,
       remark: i.remark,
     }
   }
@@ -283,7 +442,21 @@ export class OrderRepository implements IOrderRepository {
         paymentMethod: data.paymentMethod,
         remark: data.remark,
         createdBy: data.createdBy,
-        items: { create: data.items },
+        items: {
+          create: data.items.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId,
+            sku: item.sku,
+            name: item.name,
+            variantName: item.variantName,
+            image: item.image,
+            specs: item.specs ?? undefined,
+            price: item.price,
+            quantity: item.quantity,
+            subtotal: item.subtotal,
+            remark: item.remark,
+          })),
+        },
       },
       include: { items: true, shipment: true },
     })
@@ -353,9 +526,12 @@ export class OrderRepository implements IOrderRepository {
       items: (o.items ?? []).map((i: OrderItemRow) => ({
         id: i.id,
         productId: i.productId,
+        variantId: i.variantId,
         sku: i.sku,
         name: i.name,
+        variantName: i.variantName,
         image: i.image,
+        specs: i.specs as Record<string, string> | null,
         price: Number(i.price),
         quantity: i.quantity,
         subtotal: Number(i.subtotal),

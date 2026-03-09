@@ -17,7 +17,7 @@ import type {
 export class RbacManagementService implements IRbacManagementService {
   constructor(
     private readonly rbacRepo: IRbacRepository,
-    private readonly configService: IConfigService,
+    protected readonly configService: IConfigService,
   ) {}
 
   async getRoles(filters: RoleFilters): Promise<PaginatedResult<RoleVO>> {

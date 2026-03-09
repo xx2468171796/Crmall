@@ -39,9 +39,12 @@ export interface IOrderRepository {
     createdBy: string
     items: Array<{
       productId: string
+      variantId?: string
       sku: string
       name: string
+      variantName?: string
       image?: string
+      specs?: Record<string, string>
       price: number
       quantity: number
       subtotal: number

@@ -129,3 +129,79 @@ import type { IRbacManagementService } from '@/features/system/services/rbac-man
 export function createRbacManagementService(): IRbacManagementService {
   return new RbacManagementService(new RbacRepository(prisma), getConfigService())
 }
+
+// Finance 财务
+import { PaymentRepository, DisbursementRepository, InvoiceRepository, ExpenseRepository } from '@/features/finance/repositories/finance.repository'
+import { PaymentService, DisbursementService, InvoiceService, ExpenseService } from '@/features/finance/services/finance.service'
+import type { IPaymentService, IDisbursementService, IInvoiceService, IExpenseService } from '@/features/finance/services/finance.service.interface'
+
+export function createPaymentService(): IPaymentService {
+  return new PaymentService(new PaymentRepository(prisma), getConfigService())
+}
+
+export function createDisbursementService(): IDisbursementService {
+  return new DisbursementService(new DisbursementRepository(prisma), getConfigService())
+}
+
+export function createInvoiceService(): IInvoiceService {
+  return new InvoiceService(new InvoiceRepository(prisma), getConfigService())
+}
+
+export function createExpenseService(): IExpenseService {
+  return new ExpenseService(new ExpenseRepository(prisma), getConfigService())
+}
+
+// Inventory 进销存
+import {
+  WarehouseRepository, StockRepository, SnCodeRepository,
+  SupplierRepository, PurchaseOrderRepository, TransferOrderRepository,
+  StockMovementRepository,
+} from '@/features/inventory/repositories/inventory.repository'
+import {
+  WarehouseService, StockService, SnCodeService,
+  SupplierService, PurchaseOrderService, TransferOrderService,
+  StockMovementService,
+} from '@/features/inventory/services/inventory.service'
+import type {
+  IWarehouseService, IStockService, ISnCodeService,
+  ISupplierService, IPurchaseOrderService, ITransferOrderService,
+  IStockMovementService,
+} from '@/features/inventory/services/inventory.service.interface'
+
+export function createWarehouseService(): IWarehouseService {
+  return new WarehouseService(new WarehouseRepository(prisma), getConfigService())
+}
+
+export function createStockService(): IStockService {
+  return new StockService(new StockRepository(prisma), new StockMovementRepository(prisma), getConfigService())
+}
+
+export function createSnCodeService(): ISnCodeService {
+  return new SnCodeService(new SnCodeRepository(prisma), getConfigService())
+}
+
+export function createSupplierService(): ISupplierService {
+  return new SupplierService(new SupplierRepository(prisma), getConfigService())
+}
+
+export function createPurchaseOrderService(): IPurchaseOrderService {
+  return new PurchaseOrderService(
+    new PurchaseOrderRepository(prisma),
+    new StockRepository(prisma),
+    new StockMovementRepository(prisma),
+    getConfigService(),
+  )
+}
+
+export function createTransferOrderService(): ITransferOrderService {
+  return new TransferOrderService(
+    new TransferOrderRepository(prisma),
+    new StockRepository(prisma),
+    new StockMovementRepository(prisma),
+    getConfigService(),
+  )
+}
+
+export function createStockMovementService(): IStockMovementService {
+  return new StockMovementService(new StockMovementRepository(prisma), getConfigService())
+}

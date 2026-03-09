@@ -1,6 +1,6 @@
 'use server'
 
-import { requireAuth, requirePlatform, requirePermission } from '@/lib/container'
+import { requireAuth, requirePlatform } from '@/lib/container'
 import {
   createAnnouncementService, createNotificationService, createSystemConfigService,
 } from '@/lib/container'

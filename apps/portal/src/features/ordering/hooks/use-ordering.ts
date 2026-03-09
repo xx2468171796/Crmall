@@ -33,7 +33,7 @@ export function useAddToCart() {
   const qc = useQueryClient()
   const t = useTranslations('ordering')
   return useMutation({
-    mutationFn: (dto: { productId: string; quantity: number; remark?: string }) =>
+    mutationFn: (dto: { productId: string; variantId: string; quantity: number; remark?: string }) =>
       addToCartAction(dto),
     onSuccess: (r) => {
       if (r.success) {

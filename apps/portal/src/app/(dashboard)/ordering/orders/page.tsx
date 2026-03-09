@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { ClipboardList, Search, Eye, ChevronRight } from 'lucide-react'
+import { ClipboardList, Search, ChevronRight } from 'lucide-react'
 import { useOrders } from '@/features/ordering/hooks/use-ordering'
 import type { OrderFilters, OrderVO } from '@/features/ordering/types/ordering.types'
 

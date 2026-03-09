@@ -15,6 +15,8 @@ function makeProduct(overrides: Partial<CatalogProductVO> = {}): CatalogProductV
     description: null,
     images: [],
     specs: null,
+    brand: null,
+    unit: '台',
     basePrice: 100,
     tenantPrice: null,
     currency: 'TWD',
@@ -25,6 +27,7 @@ function makeProduct(overrides: Partial<CatalogProductVO> = {}): CatalogProductV
     status: 'active',
     categoryId: 'cat-1',
     categoryName: 'Category 1',
+    variants: [],
     ...overrides,
   }
 }

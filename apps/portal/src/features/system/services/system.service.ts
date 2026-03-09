@@ -17,7 +17,7 @@ import type {
 export class AnnouncementService implements IAnnouncementService {
   constructor(
     private readonly announcementRepo: IAnnouncementRepository,
-    private readonly configService: IConfigService,
+    protected readonly configService: IConfigService,
   ) {}
 
   async getPublished(userId: string, filters: AnnouncementFilters): Promise<PaginatedResult<AnnouncementVO>> {
@@ -74,10 +74,11 @@ export class NotificationService implements INotificationService {
   }
 
   async send(data: { userId: string; tenantId?: string; title: string; content?: string; type: string; module?: string; refType?: string; refId?: string }): Promise<void> {
-    const _wsEnabled = await this.configService.getBoolean('notification', 'ws_enabled', data.tenantId, true)
+    const wsEnabled = await this.configService.getBoolean('notification', 'ws_enabled', data.tenantId, true)
     // 创建数据库记录
     await this.notificationRepo.create(data)
-    // TODO: 如果 _wsEnabled，通过 WebSocket 推送
+    // TODO: 如果 wsEnabled=true，通过 WebSocket 推送
+    if (wsEnabled) { /* WebSocket push — future implementation */ }
   }
 }
 

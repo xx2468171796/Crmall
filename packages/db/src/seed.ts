@@ -352,7 +352,250 @@ async function main() {
   }
   console.log(`✅ 创建 ${categories.length} 个产品分类`)
 
-  // 10. 创建课程分类（LMS）
+  // 10. 创建仓库（总仓 + 子公司仓库）
+  const warehouseDefs = [
+    { name: '总部主仓', code: 'WH-HQ', tenantId: null, isMain: true, address: '台北市内湖区' },
+    { name: '台北仓库', code: 'WH-TPE', tenantId: subsidiaries[0].id, isMain: false, address: '台北市南港区' },
+    { name: '台中仓库', code: 'WH-TXG', tenantId: subsidiaries[1].id, isMain: false, address: '台中市西屯区' },
+    { name: '高雄仓库', code: 'WH-KHH', tenantId: subsidiaries[2].id, isMain: false, address: '高雄市前镇区' },
+  ]
+  const warehouses: Record<string, string> = {}
+  for (const wh of warehouseDefs) {
+    const warehouse = await prisma.warehouse.upsert({
+      where: { code: wh.code },
+      update: {},
+      create: wh,
+    })
+    warehouses[wh.code] = warehouse.id
+  }
+  console.log(`✅ 创建 ${warehouseDefs.length} 个仓库`)
+
+  // 11. 创建供应商
+  const supplierDefs = [
+    { name: 'Aqara 绿米联创', contact: '张经理', phone: '+86-755-12345678', email: 'sales@aqara.com' },
+    { name: '易来智能 Yeelight', contact: '李经理', phone: '+86-755-87654321', email: 'sales@yeelight.com' },
+  ]
+  const suppliers: Record<string, string> = {}
+  for (const sup of supplierDefs) {
+    const existing = await prisma.supplier.findFirst({ where: { name: sup.name } })
+    if (existing) {
+      suppliers[sup.name] = existing.id
+    } else {
+      const created = await prisma.supplier.create({ data: sup })
+      suppliers[sup.name] = created.id
+    }
+  }
+  console.log(`✅ 创建 ${supplierDefs.length} 个供应商`)
+
+  // 12. 创建 SPU 产品 + SKU 变体
+  // 清除旧的变体/库存相关数据（确保重复运行安全）
+  await prisma.stockMovement.deleteMany({})
+  await prisma.stock.deleteMany({})
+  await prisma.snCode.deleteMany({})
+  await prisma.cartItem.deleteMany({})
+  await prisma.variantAttributeValue.deleteMany({})
+  await prisma.productVariant.deleteMany({})
+  await prisma.productAttributeValue.deleteMany({})
+  await prisma.productAttribute.deleteMany({})
+  await prisma.tenantPrice.deleteMany({})
+  await prisma.catalogProduct.deleteMany({})
+
+  const allCategories = await prisma.productCategory.findMany()
+  const catMap = Object.fromEntries(allCategories.map(c => [c.slug, c.id]))
+
+  const spuProducts = [
+    { sku: 'AQ-B1', name: 'Aqara 智能窗帘电机 B1', brand: 'Aqara', category: 'curtain', basePrice: 2899, unit: '台', description: '静音设计，支持 Zigbee/WiFi' },
+    { sku: 'AQ-E1', name: 'Aqara 智能窗帘电机 E1', brand: 'Aqara', category: 'curtain', basePrice: 1999, unit: '台', description: '入门级窗帘电机' },
+    { sku: 'AQ-RB-E1', name: 'Aqara 卷帘电机 E1', brand: 'Aqara', category: 'curtain', basePrice: 1599, unit: '台', description: '适用于卷帘窗帘' },
+    { sku: 'AQ-CT-TK', name: 'Aqara 窗帘轨道套件', brand: 'Aqara', category: 'curtain', basePrice: 899, unit: '套', description: '铝合金轨道含安装配件' },
+    { sku: 'AQ-D100', name: 'Aqara 智能门锁 D100', brand: 'Aqara', category: 'lock', basePrice: 5999, unit: '台', description: '指纹/密码/NFC/钥匙四合一' },
+    { sku: 'AQ-N100', name: 'Aqara 智能门锁 N100', brand: 'Aqara', category: 'lock', basePrice: 3999, unit: '台', description: '支持 HomeKit' },
+    { sku: 'AQ-A100', name: 'Aqara 智能门锁 A100', brand: 'Aqara', category: 'lock', basePrice: 4599, unit: '台', description: '全自动推拉锁' },
+    { sku: 'AQ-LED-T1', name: 'Aqara LED 灯泡 T1', brand: 'Aqara', category: 'light', basePrice: 299, unit: '个', description: '智能 LED 灯泡，支持调色调光' },
+    { sku: 'AQ-LED-T2', name: 'Aqara 吸顶灯 T2', brand: 'Aqara', category: 'light', basePrice: 1299, unit: '台', description: '36W 智能吸顶灯' },
+    { sku: 'AQ-LED-S1', name: 'Aqara 灯带 S1', brand: 'Aqara', category: 'light', basePrice: 599, unit: '条', description: 'RGB 智能灯带 2m' },
+    { sku: 'AQ-DIM-H1', name: 'Aqara 调光器 H1', brand: 'Aqara', category: 'light', basePrice: 399, unit: '台', description: '嵌入式智能调光模块' },
+    { sku: 'AQ-MS-P2', name: 'Aqara 人体传感器 P2', brand: 'Aqara', category: 'sensor', basePrice: 299, unit: '个', description: 'mmWave 毫米波人体存在传感器' },
+    { sku: 'AQ-DW-S2', name: 'Aqara 门窗传感器 2', brand: 'Aqara', category: 'sensor', basePrice: 129, unit: '个', description: '门窗开关检测' },
+    { sku: 'AQ-TH-S1', name: 'Aqara 温湿度传感器', brand: 'Aqara', category: 'sensor', basePrice: 99, unit: '个', description: '温湿度+气压' },
+    { sku: 'AQ-WL-S1', name: 'Aqara 水浸传感器', brand: 'Aqara', category: 'sensor', basePrice: 149, unit: '个', description: '漏水检测告警' },
+    { sku: 'AQ-SM-S1', name: 'Aqara 烟雾报警器', brand: 'Aqara', category: 'sensor', basePrice: 249, unit: '个', description: '烟雾+温度异常检测' },
+    { sku: 'AQ-VB-S1', name: 'Aqara 振动传感器', brand: 'Aqara', category: 'sensor', basePrice: 129, unit: '个', description: '振动/倾斜/跌落检测' },
+    { sku: 'AQ-HUB-M3', name: 'Aqara 智能中控 M3', brand: 'Aqara', category: 'gateway', basePrice: 2999, unit: '台', description: '旗舰中控，Matter/Thread/Zigbee' },
+    { sku: 'AQ-HUB-M2', name: 'Aqara 网关 M2', brand: 'Aqara', category: 'gateway', basePrice: 899, unit: '台', description: 'Zigbee 3.0 网关' },
+    { sku: 'AQ-HUB-E1', name: 'Aqara 网关 E1', brand: 'Aqara', category: 'gateway', basePrice: 499, unit: '台', description: '入门级网关' },
+    { sku: 'AQ-S1-SGL', name: 'Aqara 智能开关 S1（单键）', brand: 'Aqara', category: 'panel', basePrice: 399, unit: '台', description: '零火版智能墙壁开关' },
+    { sku: 'AQ-S1-DBL', name: 'Aqara 智能开关 S1（双键）', brand: 'Aqara', category: 'panel', basePrice: 499, unit: '台', description: '双键智能墙壁开关' },
+    { sku: 'AQ-S1-TRI', name: 'Aqara 智能开关 S1（三键）', brand: 'Aqara', category: 'panel', basePrice: 599, unit: '台', description: '三键智能墙壁开关' },
+    { sku: 'AQ-SCENE-S1', name: 'Aqara 场景面板 S1', brand: 'Aqara', category: 'panel', basePrice: 1299, unit: '台', description: '4 寸触控场景面板' },
+    { sku: 'AQ-BTN-MINI', name: 'Aqara 无线开关（贴墙式）', brand: 'Aqara', category: 'accessory', basePrice: 129, unit: '个', description: '免布线无线场景开关' },
+    { sku: 'AQ-CUBE-T1', name: 'Aqara 魔方控制器 T1', brand: 'Aqara', category: 'accessory', basePrice: 199, unit: '个', description: '六面体手势控制' },
+  ]
+
+  const createdProducts: Record<string, string> = {}
+  for (let i = 0; i < spuProducts.length; i++) {
+    const p = spuProducts[i]
+    const product = await prisma.catalogProduct.create({
+      data: {
+        categoryId: catMap[p.category],
+        sku: p.sku,
+        name: p.name,
+        brand: p.brand,
+        description: p.description,
+        unit: p.unit,
+        basePrice: p.basePrice,
+        moq: 1,
+        sortOrder: i,
+      },
+    })
+    createdProducts[p.sku] = product.id
+  }
+  console.log(`✅ 创建 ${spuProducts.length} 个 SPU 产品`)
+
+  // 12a. 为重点产品创建属性和变体
+  // --- B1 窗帘电机: 颜色 × 版本 = 4 SKU ---
+  const b1Id = createdProducts['AQ-B1']
+  const b1ColorAttr = await prisma.productAttribute.create({ data: { productId: b1Id, name: '颜色', sortOrder: 0 } })
+  const b1VersionAttr = await prisma.productAttribute.create({ data: { productId: b1Id, name: '版本', sortOrder: 1 } })
+  const [b1White, b1Gray] = await Promise.all([
+    prisma.productAttributeValue.create({ data: { attributeId: b1ColorAttr.id, value: '白色', sortOrder: 0 } }),
+    prisma.productAttributeValue.create({ data: { attributeId: b1ColorAttr.id, value: '灰色', sortOrder: 1 } }),
+  ])
+  const [b1Zigbee, b1WiFi] = await Promise.all([
+    prisma.productAttributeValue.create({ data: { attributeId: b1VersionAttr.id, value: 'Zigbee', sortOrder: 0 } }),
+    prisma.productAttributeValue.create({ data: { attributeId: b1VersionAttr.id, value: 'WiFi', sortOrder: 1 } }),
+  ])
+  const b1Variants = [
+    { sku: 'B1-WHT-ZB', name: '白色-Zigbee', basePrice: 2899, stock: 50, attrs: [b1White.id, b1Zigbee.id] },
+    { sku: 'B1-WHT-WF', name: '白色-WiFi', basePrice: 3299, stock: 30, attrs: [b1White.id, b1WiFi.id] },
+    { sku: 'B1-GRY-ZB', name: '灰色-Zigbee', basePrice: 2899, stock: 40, attrs: [b1Gray.id, b1Zigbee.id] },
+    { sku: 'B1-GRY-WF', name: '灰色-WiFi', basePrice: 3299, stock: 25, attrs: [b1Gray.id, b1WiFi.id] },
+  ]
+
+  // --- D100 门锁: 颜色 × 连接 = 4 SKU ---
+  const d100Id = createdProducts['AQ-D100']
+  const d100ColorAttr = await prisma.productAttribute.create({ data: { productId: d100Id, name: '颜色', sortOrder: 0 } })
+  const d100ConnAttr = await prisma.productAttribute.create({ data: { productId: d100Id, name: '连接', sortOrder: 1 } })
+  const [d100Silver, d100Black] = await Promise.all([
+    prisma.productAttributeValue.create({ data: { attributeId: d100ColorAttr.id, value: '太空银', sortOrder: 0 } }),
+    prisma.productAttributeValue.create({ data: { attributeId: d100ColorAttr.id, value: '曜石黑', sortOrder: 1 } }),
+  ])
+  const [d100Zigbee, d100WiFi] = await Promise.all([
+    prisma.productAttributeValue.create({ data: { attributeId: d100ConnAttr.id, value: 'Zigbee', sortOrder: 0 } }),
+    prisma.productAttributeValue.create({ data: { attributeId: d100ConnAttr.id, value: 'WiFi', sortOrder: 1 } }),
+  ])
+  const d100Variants = [
+    { sku: 'D100-SLV-ZB', name: '太空银-Zigbee', basePrice: 5999, stock: 20, attrs: [d100Silver.id, d100Zigbee.id] },
+    { sku: 'D100-SLV-WF', name: '太空银-WiFi', basePrice: 6499, stock: 15, attrs: [d100Silver.id, d100WiFi.id] },
+    { sku: 'D100-BLK-ZB', name: '曜石黑-Zigbee', basePrice: 5999, stock: 25, attrs: [d100Black.id, d100Zigbee.id] },
+    { sku: 'D100-BLK-WF', name: '曜石黑-WiFi', basePrice: 6499, stock: 20, attrs: [d100Black.id, d100WiFi.id] },
+  ]
+
+  // --- LED T1 灯泡: 色温 × 接口 = 6 SKU ---
+  const t1Id = createdProducts['AQ-LED-T1']
+  const t1TempAttr = await prisma.productAttribute.create({ data: { productId: t1Id, name: '色温', sortOrder: 0 } })
+  const t1SocketAttr = await prisma.productAttribute.create({ data: { productId: t1Id, name: '接口', sortOrder: 1 } })
+  const [t1WarmWhite, t1CoolWhite, t1RGB] = await Promise.all([
+    prisma.productAttributeValue.create({ data: { attributeId: t1TempAttr.id, value: '暖白光', sortOrder: 0 } }),
+    prisma.productAttributeValue.create({ data: { attributeId: t1TempAttr.id, value: '冷白光', sortOrder: 1 } }),
+    prisma.productAttributeValue.create({ data: { attributeId: t1TempAttr.id, value: 'RGB调色', sortOrder: 2 } }),
+  ])
+  const [t1E27, t1E14] = await Promise.all([
+    prisma.productAttributeValue.create({ data: { attributeId: t1SocketAttr.id, value: 'E27', sortOrder: 0 } }),
+    prisma.productAttributeValue.create({ data: { attributeId: t1SocketAttr.id, value: 'E14', sortOrder: 1 } }),
+  ])
+  const t1Variants = [
+    { sku: 'T1-WW-E27', name: '暖白光-E27', basePrice: 299, stock: 200, attrs: [t1WarmWhite.id, t1E27.id] },
+    { sku: 'T1-CW-E27', name: '冷白光-E27', basePrice: 299, stock: 180, attrs: [t1CoolWhite.id, t1E27.id] },
+    { sku: 'T1-RGB-E27', name: 'RGB调色-E27', basePrice: 499, stock: 100, attrs: [t1RGB.id, t1E27.id] },
+    { sku: 'T1-WW-E14', name: '暖白光-E14', basePrice: 299, stock: 150, attrs: [t1WarmWhite.id, t1E14.id] },
+    { sku: 'T1-CW-E14', name: '冷白光-E14', basePrice: 299, stock: 120, attrs: [t1CoolWhite.id, t1E14.id] },
+    { sku: 'T1-RGB-E14', name: 'RGB调色-E14', basePrice: 499, stock: 80, attrs: [t1RGB.id, t1E14.id] },
+  ]
+
+  // 创建多属性变体
+  const allMultiVariants = [
+    { productId: b1Id, variants: b1Variants },
+    { productId: d100Id, variants: d100Variants },
+    { productId: t1Id, variants: t1Variants },
+  ]
+  const variantIds: Record<string, string> = {}
+  for (const group of allMultiVariants) {
+    for (const v of group.variants) {
+      const variant = await prisma.productVariant.create({
+        data: { productId: group.productId, sku: v.sku, name: v.name, basePrice: v.basePrice, stock: v.stock, status: 'active' },
+      })
+      variantIds[v.sku] = variant.id
+      for (const attrValId of v.attrs) {
+        await prisma.variantAttributeValue.create({ data: { variantId: variant.id, attributeValueId: attrValId } })
+      }
+    }
+  }
+
+  // 为没有多属性的产品创建默认变体
+  const multiVariantSkus = new Set(['AQ-B1', 'AQ-D100', 'AQ-LED-T1'])
+  for (const p of spuProducts) {
+    if (multiVariantSkus.has(p.sku)) continue
+    const variant = await prisma.productVariant.create({
+      data: { productId: createdProducts[p.sku], sku: `${p.sku}-DEFAULT`, name: '默认', basePrice: p.basePrice, stock: 0, status: 'active' },
+    })
+    variantIds[`${p.sku}-DEFAULT`] = variant.id
+  }
+
+  const totalVariants = b1Variants.length + d100Variants.length + t1Variants.length + (spuProducts.length - multiVariantSkus.size)
+  console.log(`✅ 创建 ${totalVariants} 个 SKU 变体（含 ${spuProducts.length - multiVariantSkus.size} 个默认变体）`)
+
+  // 13. 初始化总仓库存（所有变体入库到总仓）
+  const hqWarehouseId = warehouses['WH-HQ']
+  let stockCount = 0
+  for (const [sku, variantId] of Object.entries(variantIds)) {
+    const stockQty = sku.includes('-DEFAULT') ? 100 : undefined
+    const variant = await prisma.productVariant.findUnique({ where: { id: variantId } })
+    if (!variant) continue
+    const qty = stockQty ?? variant.stock
+    if (qty > 0) {
+      await prisma.stock.create({
+        data: { variantId, warehouseId: hqWarehouseId, quantity: qty },
+      })
+      await prisma.stockMovement.create({
+        data: {
+          variantId,
+          warehouseId: hqWarehouseId,
+          type: 'in',
+          quantity: qty,
+          refType: 'purchase',
+          remark: '初始入库',
+          createdBy: admin.id,
+        },
+      })
+      stockCount++
+    }
+  }
+  console.log(`✅ 初始化 ${stockCount} 条总仓库存`)
+
+  // 14. 子公司专属价格（台北 95 折，台中 93 折，高雄 92 折）
+  const discountMap: Record<string, number> = {
+    [subsidiaries[0].id]: 0.95,
+    [subsidiaries[1].id]: 0.93,
+    [subsidiaries[2].id]: 0.92,
+  }
+  let priceCount = 0
+  for (const p of spuProducts) {
+    for (const [tenantId, discount] of Object.entries(discountMap)) {
+      await prisma.tenantPrice.create({
+        data: {
+          productId: createdProducts[p.sku],
+          tenantId,
+          price: Math.round(p.basePrice * discount),
+          currency: 'TWD',
+        },
+      })
+      priceCount++
+    }
+  }
+  console.log(`✅ 创建 ${priceCount} 条子公司专属价格`)
+
+  // 16. 创建课程分类（LMS）
   const courseCategories = [
     { name: '产品培训', slug: 'product' },
     { name: '安装技术', slug: 'service' },

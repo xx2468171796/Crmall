@@ -157,6 +157,22 @@ function CartItemRow({ item }: { item: CartItemVO }) {
         <div>
           <h3 className="font-medium text-sm truncate">{item.productName}</h3>
           <p className="text-xs text-[var(--muted-foreground)]">{item.productSku}</p>
+          {/* 变体信息 */}
+          {item.variantName && (
+            <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{item.variantName}</p>
+          )}
+          {item.specs && Object.keys(item.specs).length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {Object.entries(item.specs).map(([key, value]) => (
+                <span
+                  key={key}
+                  className="inline-flex rounded bg-[var(--muted)] px-1.5 py-0.5 text-[10px] text-[var(--muted-foreground)]"
+                >
+                  {key}: {value}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <p className="text-sm font-semibold text-[#8b5cf6]">
           {t('unit_price')}: NT$ {item.price.toLocaleString()}

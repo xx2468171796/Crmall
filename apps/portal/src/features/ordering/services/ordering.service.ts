@@ -26,7 +26,7 @@ import type {
 export class CatalogService implements ICatalogService {
   constructor(
     private readonly catalogRepo: ICatalogRepository,
-    private readonly configService: IConfigService,
+    protected readonly configService: IConfigService,
   ) {}
 
   async getProducts(tenantId: string, filters: CatalogFilters): Promise<PaginatedResult<CatalogProductVO>> {
@@ -44,7 +44,7 @@ export class CartService implements ICartService {
   constructor(
     private readonly cartRepo: ICartRepository,
     private readonly catalogRepo: ICatalogRepository,
-    private readonly configService: IConfigService,
+    protected readonly configService: IConfigService,
   ) {}
 
   async getCart(tenantId: string, userId: string): Promise<CartItemVO[]> {
@@ -55,10 +55,19 @@ export class CartService implements ICartService {
     const product = await this.catalogRepo.findProductById(dto.productId, tenantId)
     if (!product) throw new NotFoundError('产品', dto.productId)
     if (product.status !== 'active') throw new BusinessRuleError('该产品已下架')
-    if (dto.quantity < product.moq) throw new BusinessRuleError(`最小起订量为 ${product.moq}`)
-    if (dto.quantity > product.stock) throw new InsufficientStockError(product.name, product.stock, dto.quantity)
 
-    const price = product.tenantPrice ?? product.basePrice
+    // 查找变体并校验
+    const variant = product.variants.find((v) => v.id === dto.variantId)
+    if (!variant) throw new NotFoundError('产品变体', dto.variantId)
+    if (variant.status !== 'active') throw new BusinessRuleError('该变体已下架')
+
+    // MOQ: 变体级 > SPU 级
+    const moq = variant.moq ?? product.moq
+    if (dto.quantity < moq) throw new BusinessRuleError(`最小起订量为 ${moq}`)
+    if (dto.quantity > variant.stock) throw new InsufficientStockError(product.name, variant.stock, dto.quantity)
+
+    // 4 级价格: variantTenantPrice > spuTenantPrice > variantBasePrice > spuBasePrice
+    const price = variant.tenantPrice ?? product.tenantPrice ?? variant.basePrice ?? product.basePrice
     return this.cartRepo.addItem(tenantId, userId, dto, price)
   }
 
@@ -77,7 +86,7 @@ export class OrderService implements IOrderService {
   constructor(
     private readonly orderRepo: IOrderRepository,
     private readonly cartRepo: ICartRepository,
-    private readonly catalogRepo: ICatalogRepository,
+    protected readonly catalogRepo: ICatalogRepository,
     private readonly accountRepo: IAccountRepository,
     private readonly configService: IConfigService,
   ) {}
@@ -130,9 +139,12 @@ export class OrderService implements IOrderService {
       createdBy: userId,
       items: cartItems.map((item) => ({
         productId: item.productId,
-        sku: item.productSku,
+        variantId: item.variantId ?? undefined,
+        sku: item.variantSku ?? item.productSku,
         name: item.productName,
+        variantName: item.variantName ?? undefined,
         image: item.productImage ?? undefined,
+        specs: item.specs ?? undefined,
         price: item.price,
         quantity: item.quantity,
         subtotal: item.subtotal,
@@ -184,7 +196,7 @@ export class OrderService implements IOrderService {
     }
   }
 
-  async shipOrder(id: string, dto: ShipOrderDTO): Promise<void> {
+  async shipOrder(id: string, _dto: ShipOrderDTO): Promise<void> {
     const order = await this.orderRepo.findById(id)
     if (!order) throw new NotFoundError('订单', id)
     if (order.status !== 'confirmed') throw new BusinessRuleError('只能发货已确认的订单')
@@ -205,7 +217,7 @@ export class OrderService implements IOrderService {
 export class AccountService implements IAccountService {
   constructor(
     private readonly accountRepo: IAccountRepository,
-    private readonly configService: IConfigService,
+    protected readonly configService: IConfigService,
   ) {}
 
   async getAccount(tenantId: string): Promise<TenantAccountVO | null> {

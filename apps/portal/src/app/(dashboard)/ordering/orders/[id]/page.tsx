@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import {
   ArrowLeft, Package, Truck, CheckCircle2, XCircle, Clock,
-  MapPin, FileText,
+  FileText,
 } from 'lucide-react'
 import { useOrderDetail, useCancelOrder, useConfirmReceive } from '@/features/ordering/hooks/use-ordering'
 import type { OrderVO, OrderItemVO, ShipmentVO } from '@/features/ordering/types/ordering.types'
@@ -184,6 +184,22 @@ function OrderItemRow({ item }: { item: OrderItemVO }) {
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{item.name}</p>
         <p className="text-xs text-[var(--muted-foreground)]">{item.sku}</p>
+        {/* 变体信息 */}
+        {item.variantName && (
+          <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{item.variantName}</p>
+        )}
+        {item.specs && Object.keys(item.specs).length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {Object.entries(item.specs).map(([key, value]) => (
+              <span
+                key={key}
+                className="inline-flex rounded bg-[var(--muted)] px-1.5 py-0.5 text-[10px] text-[var(--muted-foreground)]"
+              >
+                {key}: {value}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <div className="text-right shrink-0">
         <p className="text-sm">× {item.quantity}</p>
