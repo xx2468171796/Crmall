@@ -11,6 +11,59 @@ import type {
   FollowUpVO, CreateFollowUpDTO,
 } from '../types/crm.types'
 
+// ---- Row types for Prisma query results ----
+
+interface CustomerRow {
+  id: string
+  tenantId: string
+  name: string
+  type: string
+  industry: string | null
+  source: string | null
+  phone: string | null
+  email: string | null
+  address: string | null
+  city: string | null
+  region: string | null
+  level: string
+  status: string
+  ownerId: string | null
+  tags: string[]
+  remark: string | null
+  createdAt: Date
+  updatedAt: Date
+  _count?: { contacts: number; opportunities: number }
+}
+
+interface OpportunityRow {
+  id: string
+  tenantId: string
+  customerId: string
+  customer?: { name: string }
+  title: string
+  amount: { toNumber(): number } | number
+  currency: string
+  stage: string
+  probability: number
+  expectedDate: Date | null
+  lostReason: string | null
+  source: string | null
+  ownerId: string
+  tags: string[]
+  remark: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+interface FollowUpRow {
+  id: string
+  type: string
+  content: string
+  nextDate: Date | null
+  createdBy: string
+  createdAt: Date
+}
+
 export class CustomerRepository implements ICustomerRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -19,13 +72,13 @@ export class CustomerRepository implements ICustomerRepository {
       where: { id },
       include: { _count: { select: { contacts: true, opportunities: true } } },
     })
-    return c ? this.toVO(c) : null
+    return c ? this.toVO(c as unknown as CustomerRow) : null
   }
 
   async findByTenant(tenantId: string, filters: CustomerFilters): Promise<PaginatedResult<CustomerVO>> {
     const page = filters.page ?? 1
     const perPage = filters.perPage ?? 20
-    const where: any = { tenantId }
+    const where: Record<string, unknown> = { tenantId }
     if (filters.status) where.status = filters.status
     if (filters.level) where.level = filters.level
     if (filters.source) where.source = filters.source
@@ -50,7 +103,7 @@ export class CustomerRepository implements ICustomerRepository {
     ])
 
     return {
-      items: items.map((c) => this.toVO(c)),
+      items: items.map((c) => this.toVO(c as unknown as CustomerRow)),
       total, page, perPage,
       totalPages: Math.ceil(total / perPage),
     }
@@ -61,7 +114,7 @@ export class CustomerRepository implements ICustomerRepository {
       data: { ...dto, tenantId, createdBy },
       include: { _count: { select: { contacts: true, opportunities: true } } },
     })
-    return this.toVO(c)
+    return this.toVO(c as unknown as CustomerRow)
   }
 
   async update(id: string, dto: UpdateCustomerDTO): Promise<CustomerVO> {
@@ -70,14 +123,14 @@ export class CustomerRepository implements ICustomerRepository {
       data: dto,
       include: { _count: { select: { contacts: true, opportunities: true } } },
     })
-    return this.toVO(c)
+    return this.toVO(c as unknown as CustomerRow)
   }
 
   async delete(id: string): Promise<void> {
     await this.prisma.customer.delete({ where: { id } })
   }
 
-  private toVO(c: any): CustomerVO {
+  private toVO(c: CustomerRow): CustomerVO {
     return {
       id: c.id, tenantId: c.tenantId, name: c.name, type: c.type,
       industry: c.industry, source: c.source, phone: c.phone, email: c.email,
@@ -100,13 +153,13 @@ export class OpportunityRepository implements IOpportunityRepository {
       where: { id },
       include: { customer: { select: { name: true } } },
     })
-    return o ? this.toVO(o) : null
+    return o ? this.toVO(o as unknown as OpportunityRow) : null
   }
 
   async findByTenant(tenantId: string, filters: OpportunityFilters): Promise<PaginatedResult<OpportunityVO>> {
     const page = filters.page ?? 1
     const perPage = filters.perPage ?? 20
-    const where: any = { tenantId }
+    const where: Record<string, unknown> = { tenantId }
     if (filters.stage) where.stage = filters.stage
     if (filters.ownerId) where.ownerId = filters.ownerId
     if (filters.customerId) where.customerId = filters.customerId
@@ -126,7 +179,7 @@ export class OpportunityRepository implements IOpportunityRepository {
     ])
 
     return {
-      items: items.map((o) => this.toVO(o)),
+      items: items.map((o) => this.toVO(o as unknown as OpportunityRow)),
       total, page, perPage,
       totalPages: Math.ceil(total / perPage),
     }
@@ -137,7 +190,7 @@ export class OpportunityRepository implements IOpportunityRepository {
       data: { ...dto, tenantId, createdBy },
       include: { customer: { select: { name: true } } },
     })
-    return this.toVO(o)
+    return this.toVO(o as unknown as OpportunityRow)
   }
 
   async update(id: string, dto: UpdateOpportunityDTO): Promise<OpportunityVO> {
@@ -146,14 +199,14 @@ export class OpportunityRepository implements IOpportunityRepository {
       data: dto,
       include: { customer: { select: { name: true } } },
     })
-    return this.toVO(o)
+    return this.toVO(o as unknown as OpportunityRow)
   }
 
   async delete(id: string): Promise<void> {
     await this.prisma.opportunity.delete({ where: { id } })
   }
 
-  private toVO(o: any): OpportunityVO {
+  private toVO(o: OpportunityRow): OpportunityVO {
     return {
       id: o.id, tenantId: o.tenantId, customerId: o.customerId,
       customerName: o.customer?.name ?? '',
@@ -176,7 +229,7 @@ export class FollowUpRepository implements IFollowUpRepository {
       where: { customerId },
       orderBy: { createdAt: 'desc' },
     })
-    return items.map(this.toVO)
+    return items.map((f) => this.toVO(f as unknown as FollowUpRow))
   }
 
   async findByOpportunity(opportunityId: string): Promise<FollowUpVO[]> {
@@ -184,17 +237,17 @@ export class FollowUpRepository implements IFollowUpRepository {
       where: { opportunityId },
       orderBy: { createdAt: 'desc' },
     })
-    return items.map(this.toVO)
+    return items.map((f) => this.toVO(f as unknown as FollowUpRow))
   }
 
   async create(tenantId: string, dto: CreateFollowUpDTO, createdBy: string): Promise<FollowUpVO> {
     const f = await this.prisma.followUp.create({
       data: { ...dto, tenantId, createdBy },
     })
-    return this.toVO(f)
+    return this.toVO(f as unknown as FollowUpRow)
   }
 
-  private toVO(f: any): FollowUpVO {
+  private toVO(f: FollowUpRow): FollowUpVO {
     return {
       id: f.id, type: f.type, content: f.content,
       nextDate: f.nextDate?.toISOString() ?? null,

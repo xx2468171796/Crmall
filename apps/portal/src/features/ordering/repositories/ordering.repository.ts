@@ -15,6 +15,110 @@ import type {
   TenantAccountVO,
 } from '../types/ordering.types'
 
+// ---- Row types for Prisma query results ----
+
+interface CatalogProductRow {
+  id: string
+  sku: string
+  name: string
+  description: string | null
+  images: string[]
+  specs: unknown
+  basePrice: { toNumber(): number } | number
+  currency: string
+  moq: number
+  stock: number
+  isCustom: boolean
+  customNote: string | null
+  status: string
+  sortOrder: number
+  categoryId: string
+  category: { name: string }
+  prices?: Array<{ tenantId: string; price: { toNumber(): number } | number }>
+}
+
+interface CartItemRow {
+  id: string
+  productId: string
+  product: {
+    name: string
+    sku: string
+    images: string[]
+    basePrice: { toNumber(): number } | number
+    moq: number
+    stock: number
+  }
+  quantity: number
+  remark: string | null
+}
+
+interface OrderItemRow {
+  id: string
+  productId: string
+  sku: string
+  name: string
+  image: string | null
+  price: { toNumber(): number } | number
+  quantity: number
+  subtotal: { toNumber(): number } | number
+  remark: string | null
+}
+
+interface ShipmentRow {
+  id: string
+  orderId: string
+  carrier: string | null
+  trackingNo: string | null
+  shippedAt: Date | null
+  deliveredAt: Date | null
+  receivedAt: Date | null
+  status: string
+  remark: string | null
+}
+
+interface OrderRow {
+  id: string
+  orderNo: string
+  tenantId: string
+  totalAmount: { toNumber(): number } | number
+  currency: string
+  status: string
+  paymentMethod: string
+  remark: string | null
+  cancelReason: string | null
+  createdBy: string
+  confirmedAt: Date | null
+  createdAt: Date
+  updatedAt: Date
+  items: OrderItemRow[]
+  shipment: ShipmentRow | null
+}
+
+interface CreateOrderData {
+  orderNo: string
+  tenantId: string
+  totalAmount: number
+  currency: string
+  status: string
+  paymentMethod: string
+  remark?: string
+  createdBy: string
+  items: Array<{
+    productId: string
+    sku: string
+    name: string
+    image?: string
+    price: number
+    quantity: number
+    subtotal: number
+    remark?: string
+  }>
+}
+
+interface OrderQueryFilters extends OrderFilters {
+  tenantId?: string
+}
+
 // ---- 产品目录 ----
 
 export class CatalogRepository implements ICatalogRepository {
@@ -23,7 +127,7 @@ export class CatalogRepository implements ICatalogRepository {
   async findProducts(tenantId: string, filters: CatalogFilters): Promise<PaginatedResult<CatalogProductVO>> {
     const page = filters.page ?? 1
     const perPage = filters.perPage ?? 20
-    const where: any = { status: filters.status ?? 'active' }
+    const where: Record<string, unknown> = { status: filters.status ?? 'active' }
     if (filters.categoryId) where.categoryId = filters.categoryId
     if (filters.search) {
       where.OR = [
@@ -47,7 +151,7 @@ export class CatalogRepository implements ICatalogRepository {
     ])
 
     return {
-      items: items.map((p) => this.toVO(p, tenantId)),
+      items: items.map((p) => this.toVO(p as unknown as CatalogProductRow, tenantId)),
       total,
       page,
       perPage,
@@ -63,10 +167,10 @@ export class CatalogRepository implements ICatalogRepository {
         prices: { where: { tenantId } },
       },
     })
-    return p ? this.toVO(p, tenantId) : null
+    return p ? this.toVO(p as unknown as CatalogProductRow, tenantId) : null
   }
 
-  private toVO(p: any, _tenantId: string): CatalogProductVO {
+  private toVO(p: CatalogProductRow, _tenantId: string): CatalogProductVO {
     const tenantPrice = p.prices?.[0]?.price
     return {
       id: p.id,
@@ -100,7 +204,7 @@ export class CartRepository implements ICartRepository {
       include: { product: true },
       orderBy: { createdAt: 'desc' },
     })
-    return items.map((i) => this.toVO(i))
+    return items.map((i) => this.toVO(i as unknown as CartItemRow))
   }
 
   async addItem(tenantId: string, userId: string, dto: AddToCartDTO, _price: number): Promise<CartItemVO> {
@@ -110,7 +214,7 @@ export class CartRepository implements ICartRepository {
       create: { tenantId, userId, productId: dto.productId, quantity: dto.quantity, remark: dto.remark },
       include: { product: true },
     })
-    return this.toVO(item)
+    return this.toVO(item as unknown as CartItemRow)
   }
 
   async updateItem(id: string, dto: UpdateCartDTO): Promise<CartItemVO> {
@@ -119,7 +223,7 @@ export class CartRepository implements ICartRepository {
       data: { quantity: dto.quantity, remark: dto.remark },
       include: { product: true },
     })
-    return this.toVO(item)
+    return this.toVO(item as unknown as CartItemRow)
   }
 
   async removeItem(id: string): Promise<void> {
@@ -130,7 +234,7 @@ export class CartRepository implements ICartRepository {
     await this.prisma.cartItem.deleteMany({ where: { tenantId, userId } })
   }
 
-  private toVO(i: any): CartItemVO {
+  private toVO(i: CartItemRow): CartItemVO {
     return {
       id: i.id,
       productId: i.productId,
@@ -157,7 +261,7 @@ export class OrderRepository implements IOrderRepository {
       where: { id },
       include: { items: true, shipment: true },
     })
-    return o ? this.toVO(o) : null
+    return o ? this.toVO(o as unknown as OrderRow) : null
   }
 
   async findByTenant(tenantId: string, filters: OrderFilters): Promise<PaginatedResult<OrderVO>> {
@@ -168,7 +272,7 @@ export class OrderRepository implements IOrderRepository {
     return this.query(filters)
   }
 
-  async create(data: any): Promise<OrderVO> {
+  async create(data: CreateOrderData): Promise<OrderVO> {
     const o = await this.prisma.order.create({
       data: {
         orderNo: data.orderNo,
@@ -183,11 +287,11 @@ export class OrderRepository implements IOrderRepository {
       },
       include: { items: true, shipment: true },
     })
-    return this.toVO(o)
+    return this.toVO(o as unknown as OrderRow)
   }
 
   async updateStatus(id: string, status: string): Promise<void> {
-    const data: any = { status }
+    const data: Record<string, unknown> = { status }
     if (status === 'confirmed') data.confirmedAt = new Date()
     await this.prisma.order.update({ where: { id }, data })
   }
@@ -199,10 +303,10 @@ export class OrderRepository implements IOrderRepository {
     })
   }
 
-  private async query(filters: any): Promise<PaginatedResult<OrderVO>> {
+  private async query(filters: OrderQueryFilters): Promise<PaginatedResult<OrderVO>> {
     const page = filters.page ?? 1
     const perPage = filters.perPage ?? 20
-    const where: any = {}
+    const where: Record<string, unknown> = {}
     if (filters.tenantId) where.tenantId = filters.tenantId
     if (filters.status) where.status = filters.status
     if (filters.search) {
@@ -221,7 +325,7 @@ export class OrderRepository implements IOrderRepository {
     ])
 
     return {
-      items: items.map((o) => this.toVO(o)),
+      items: items.map((o) => this.toVO(o as unknown as OrderRow)),
       total,
       page,
       perPage,
@@ -229,7 +333,7 @@ export class OrderRepository implements IOrderRepository {
     }
   }
 
-  private toVO(o: any): OrderVO {
+  private toVO(o: OrderRow): OrderVO {
     return {
       id: o.id,
       orderNo: o.orderNo,
@@ -244,7 +348,7 @@ export class OrderRepository implements IOrderRepository {
       confirmedAt: o.confirmedAt?.toISOString() ?? null,
       createdAt: o.createdAt.toISOString(),
       updatedAt: o.updatedAt.toISOString(),
-      items: (o.items ?? []).map((i: any) => ({
+      items: (o.items ?? []).map((i: OrderItemRow) => ({
         id: i.id,
         productId: i.productId,
         sku: i.sku,
