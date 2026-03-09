@@ -13,11 +13,13 @@ import type { SessionUser } from '@twcrm/shared'
 export interface IRbacService {
   requireAuth(): Promise<SessionUser>
   requirePermission(permission: string): Promise<SessionUser>
+  requireAllPermissions(permissions: string[]): Promise<SessionUser>
   requireAnyPermission(permissions: string[]): Promise<SessionUser>
   requirePlatform(): Promise<SessionUser>
   requireRole(role: string): Promise<SessionUser>
   hasPermission(user: SessionUser, permission: string): boolean
   hasRole(user: SessionUser, role: string): boolean
+  getDataScope(user: SessionUser, permission: string): string
 }
 
 export class RbacService implements IRbacService {
@@ -33,6 +35,15 @@ export class RbacService implements IRbacService {
     const user = await this.requireAuth()
     if (!this.hasPermission(user, permission)) {
       throw new ForbiddenError(`缺少权限: ${permission}`)
+    }
+    return user
+  }
+
+  async requireAllPermissions(permissions: string[]): Promise<SessionUser> {
+    const user = await this.requireAuth()
+    const missing = permissions.filter((p) => !this.hasPermission(user, p))
+    if (missing.length > 0) {
+      throw new ForbiddenError(`缺少权限: ${missing.join(', ')}`)
     }
     return user
   }
@@ -69,5 +80,10 @@ export class RbacService implements IRbacService {
 
   hasRole(user: SessionUser, role: string): boolean {
     return user.roles.includes(role)
+  }
+
+  getDataScope(user: SessionUser, permission: string): string {
+    if (user.roles.includes(ROLES.PLATFORM_ADMIN)) return 'all'
+    return user.dataScopes?.[permission] ?? 'own'
   }
 }

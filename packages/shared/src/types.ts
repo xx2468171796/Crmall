@@ -15,8 +15,10 @@ export interface SessionUser {
   tenantId: string
   tenantCode: string
   tenantName: string
+  departmentId: string | null
   roles: string[]
   permissions: string[]
+  dataScopes: Record<string, string>
   locale: Locale
   isPlatform: boolean /// 是否总部用户
 }

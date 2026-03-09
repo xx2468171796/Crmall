@@ -154,6 +154,47 @@ async function main() {
   })
   console.log(`✅ 创建超级管理员: ${admin.email}`)
 
+  // 4.1 创建子公司测试用户
+  const tenantAdminRole = roles[2]
+  const tenantUserRole = roles[4]
+
+  const tpeAdmin = await prisma.user.upsert({
+    where: { email: 'tpe_admin' },
+    update: { passwordHash },
+    create: {
+      tenantId: subsidiaries[0].id,
+      email: 'tpe_admin',
+      name: '台北管理员',
+      passwordHash,
+      locale: 'zh-TW',
+      status: 'active',
+    },
+  })
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: tpeAdmin.id, roleId: tenantAdminRole.id } },
+    update: {},
+    create: { userId: tpeAdmin.id, roleId: tenantAdminRole.id },
+  })
+
+  const tpeUser = await prisma.user.upsert({
+    where: { email: 'tpe_user' },
+    update: { passwordHash },
+    create: {
+      tenantId: subsidiaries[0].id,
+      email: 'tpe_user',
+      name: '台北员工',
+      passwordHash,
+      locale: 'zh-TW',
+      status: 'active',
+    },
+  })
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: tpeUser.id, roleId: tenantUserRole.id } },
+    update: {},
+    create: { userId: tpeUser.id, roleId: tenantUserRole.id },
+  })
+  console.log(`✅ 创建子公司测试用户: tpe_admin, tpe_user`)
+
   // 5. 创建基础权限
   const modules = ['crm', 'ordering', 'inventory', 'finance', 'okr', 'docs', 'lms', 'system', 'platform']
   const actions = ['create', 'read', 'update', 'delete', 'export', 'approve', 'assign']
@@ -195,10 +236,77 @@ async function main() {
         roleId_permissionId: { roleId: platformAdminRole.id, permissionId: perm.id },
       },
       update: {},
-      create: { roleId: platformAdminRole.id, permissionId: perm.id },
+      create: { roleId: platformAdminRole.id, permissionId: perm.id, dataScope: 'all' },
     })
   }
   console.log(`✅ 为 platform_admin 分配 ${allPerms.length} 个权限`)
+
+  // 6.1 给 platform_viewer 分配只读权限
+  const readPerms = allPerms.filter((p) => p.action === 'read' || p.action === 'export')
+  const platformViewerRole = roles[1]
+  for (const perm of readPerms) {
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: platformViewerRole.id, permissionId: perm.id } },
+      update: {},
+      create: { roleId: platformViewerRole.id, permissionId: perm.id, dataScope: 'all' },
+    })
+  }
+  console.log(`✅ 为 platform_viewer 分配 ${readPerms.length} 个只读权限`)
+
+  // 6.2 给 tenant_admin 分配非平台权限
+  const tenantPerms = allPerms.filter((p) => p.module !== 'platform')
+  for (const perm of tenantPerms) {
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: tenantAdminRole.id, permissionId: perm.id } },
+      update: {},
+      create: { roleId: tenantAdminRole.id, permissionId: perm.id, dataScope: 'all' },
+    })
+  }
+  console.log(`✅ 为 tenant_admin 分配 ${tenantPerms.length} 个权限`)
+
+  // 6.3 给 tenant_manager 分配管理权限（排除 delete 关键资源 + 排除 platform）
+  const tenantManagerRole = roles[3]
+  const criticalResources = ['tenant', 'user', 'role', 'permission', 'department', 'warehouse', 'customer', 'contract']
+  const managerPerms = allPerms.filter((p) => {
+    if (p.module === 'platform') return false
+    if (p.action === 'delete' && criticalResources.includes(p.resource)) return false
+    return true
+  })
+  for (const perm of managerPerms) {
+    const scope = (perm.action === 'delete' || perm.action === 'assign') ? 'own' : 'all'
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: tenantManagerRole.id, permissionId: perm.id } },
+      update: {},
+      create: { roleId: tenantManagerRole.id, permissionId: perm.id, dataScope: scope },
+    })
+  }
+  console.log(`✅ 为 tenant_manager 分配 ${managerPerms.length} 个权限`)
+
+  // 6.4 给 tenant_user 分配基本权限
+  const userAllowedActions: Record<string, string[]> = {
+    crm: ['read', 'create', 'update'],
+    ordering: ['read', 'create', 'update'],
+    inventory: ['read'],
+    finance: ['read'],
+    okr: ['read', 'create', 'update'],
+    docs: ['read', 'create', 'update'],
+    lms: ['read'],
+    system: ['read', 'update'],
+  }
+  const userPerms = allPerms.filter((p) => {
+    const allowed = userAllowedActions[p.module]
+    if (!allowed) return false
+    return allowed.includes(p.action)
+  })
+  for (const perm of userPerms) {
+    const scope = (perm.action === 'create' || perm.action === 'update') ? 'own' : 'all'
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: tenantUserRole.id, permissionId: perm.id } },
+      update: {},
+      create: { roleId: tenantUserRole.id, permissionId: perm.id, dataScope: scope },
+    })
+  }
+  console.log(`✅ 为 tenant_user 分配 ${userPerms.length} 个权限`)
 
   // 7. 创建子公司余额账户
   for (const sub of subsidiaries) {

@@ -127,6 +127,7 @@ model RolePermission {
   role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permissionId String
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  dataScope    String     @default("all") /// 数据范围: all | department | own
 
   @@unique([roleId, permissionId])
   @@schema("auth")
