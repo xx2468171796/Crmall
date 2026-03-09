@@ -37,6 +37,7 @@ model Tenant {
 
   users       User[]
   departments Department[]
+  roles       Role[]
   account     TenantAccount?
 
   @@schema("auth")
@@ -74,7 +75,7 @@ model User {
   name          String
   avatar        String?
   passwordHash  String
-  locale        String    @default("zh-CN") /// zh-CN | zh-TW | en
+  locale        String    @default("zh-TW") /// zh-CN | zh-TW | en
   status        String    @default("active") /// active | disabled | locked
   lastLoginAt   DateTime?
   lastLoginIp   String?
@@ -92,7 +93,8 @@ model User {
 model Role {
   id          String   @id @default(cuid())
   tenantId    String?  /// null = 系统角色, 有值 = 租户自定义角色
-  name        String   @unique
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  name        String
   displayName String
   description String?
   level       Int      @default(0) /// 角色层级，数字越小权限越大
@@ -103,6 +105,7 @@ model Role {
   permissions RolePermission[]
   users       UserRole[]
 
+  @@unique([tenantId, name])
   @@index([tenantId])
   @@schema("auth")
 }

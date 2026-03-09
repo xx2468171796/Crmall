@@ -4,6 +4,7 @@
 
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '../generated/client'
+import { PERMISSIONS } from '@twcrm/shared'
 
 const connectionString = process.env.DATABASE_URL
 if (!connectionString) {
@@ -15,64 +16,28 @@ const prisma = new PrismaClient({ adapter })
 async function main() {
   console.log('🌱 开始初始化数据...')
 
-  // 1. 创建系统角色
-  const roles = await Promise.all([
-    prisma.role.upsert({
-      where: { name: 'platform_admin' },
-      update: {},
-      create: {
-        name: 'platform_admin',
-        displayName: '总部超级管理员',
-        description: '拥有所有权限，可查看所有租户数据',
-        level: 0,
-        isSystem: true,
-      },
-    }),
-    prisma.role.upsert({
-      where: { name: 'platform_viewer' },
-      update: {},
-      create: {
-        name: 'platform_viewer',
-        displayName: '总部查看者',
-        description: '只读权限，用于大屏展示',
-        level: 1,
-        isSystem: true,
-      },
-    }),
-    prisma.role.upsert({
-      where: { name: 'tenant_admin' },
-      update: {},
-      create: {
-        name: 'tenant_admin',
-        displayName: '子公司管理员',
-        description: '子公司最高权限',
-        level: 10,
-        isSystem: true,
-      },
-    }),
-    prisma.role.upsert({
-      where: { name: 'tenant_manager' },
-      update: {},
-      create: {
-        name: 'tenant_manager',
-        displayName: '子公司经理',
-        description: '子公司管理权限',
-        level: 20,
-        isSystem: true,
-      },
-    }),
-    prisma.role.upsert({
-      where: { name: 'tenant_user' },
-      update: {},
-      create: {
-        name: 'tenant_user',
-        displayName: '子公司员工',
-        description: '子公司普通员工',
-        level: 30,
-        isSystem: true,
-      },
-    }),
-  ])
+  // 1. 创建系统角色 (tenantId=null 表示系统角色)
+  // 注意: Prisma compound unique (tenantId, name) 不支持 null 作为 findUnique/upsert 参数
+  // 因此使用 findFirst + create 模式
+  const systemRoleDefs = [
+    { name: 'platform_admin', displayName: '总部超级管理员', description: '拥有所有权限，可查看所有租户数据', level: 0 },
+    { name: 'platform_viewer', displayName: '总部查看者', description: '只读权限，用于大屏展示', level: 1 },
+    { name: 'tenant_admin', displayName: '子公司管理员', description: '子公司最高权限', level: 10 },
+    { name: 'tenant_manager', displayName: '子公司经理', description: '子公司管理权限', level: 20 },
+    { name: 'tenant_user', displayName: '子公司员工', description: '子公司普通员工', level: 30 },
+  ]
+  const roles = []
+  for (const def of systemRoleDefs) {
+    const existing = await prisma.role.findFirst({ where: { tenantId: null, name: def.name } })
+    if (existing) {
+      roles.push(existing)
+    } else {
+      const created = await prisma.role.create({
+        data: { ...def, isSystem: true },
+      })
+      roles.push(created)
+    }
+  }
   console.log(`✅ 创建 ${roles.length} 个系统角色`)
 
   // 2. 创建总部租户
@@ -138,7 +103,7 @@ async function main() {
       email: 'admin@twcrm.com',
       name: '系统管理员',
       passwordHash,
-      locale: 'zh-CN',
+      locale: 'zh-TW',
       status: 'active',
     },
   })
@@ -198,38 +163,21 @@ async function main() {
   })
   console.log(`✅ 创建子公司测试用户: tpe_admin, tpe_user`)
 
-  // 5. 创建基础权限
-  const modules = ['crm', 'ordering', 'inventory', 'finance', 'okr', 'docs', 'lms', 'system', 'platform']
-  const actions = ['create', 'read', 'update', 'delete', 'export', 'approve', 'assign']
-  const resources: Record<string, string[]> = {
-    crm: ['customer', 'contact', 'opportunity', 'contract', 'workorder', 'followup'],
-    ordering: ['catalog', 'order', 'price', 'account', 'shipment', 'cart'],
-    inventory: ['warehouse', 'product', 'stock', 'sn', 'purchase', 'transfer', 'supplier'],
-    finance: ['payment', 'disbursement', 'invoice', 'expense', 'report'],
-    okr: ['objective', 'keyresult', 'kpi', 'project', 'task', 'todo'],
-    docs: ['space', 'document', 'comment'],
-    lms: ['course', 'chapter', 'quiz', 'assignment', 'certificate'],
-    system: ['announcement', 'notification', 'config', 'audit', 'attachment'],
-    platform: ['tenant', 'user', 'role', 'permission', 'department', 'dashboard'],
-  }
-
+  // 5. 创建基础权限（仅创建 PERMISSIONS 常量中定义的有意义权限）
+  const permValues = Object.values(PERMISSIONS)
   let permCount = 0
-  for (const mod of modules) {
-    const modResources = resources[mod] || []
-    for (const resource of modResources) {
-      for (const action of actions) {
-        await prisma.permission.upsert({
-          where: {
-            module_action_resource: { module: mod, action, resource },
-          },
-          update: {},
-          create: { module: mod, action, resource, description: `${mod}.${resource}.${action}` },
-        })
-        permCount++
-      }
-    }
+  for (const code of permValues) {
+    const [module, action, resource] = code.split(':')
+    await prisma.permission.upsert({
+      where: {
+        module_action_resource: { module, action, resource },
+      },
+      update: {},
+      create: { module, action, resource, description: `${module}:${action}:${resource}` },
+    })
+    permCount++
   }
-  console.log(`✅ 创建 ${permCount} 个权限`)
+  console.log(`✅ 创建 ${permCount} 个权限（基于 PERMISSIONS 常量）`)
 
   // 6. 给 platform_admin 分配所有权限
   const allPerms = await prisma.permission.findMany()
@@ -331,7 +279,7 @@ async function main() {
     // ---- general ----
     { group: 'general', key: 'app_name', value: '"TWCRM 台湾智能家居 CRM"', label: '系统名称' },
     { group: 'general', key: 'app_logo', value: '"/logo.svg"', label: '系统 Logo' },
-    { group: 'general', key: 'default_locale', value: '"zh-CN"', label: '默认语言' },
+    { group: 'general', key: 'default_locale', value: '"zh-TW"', label: '默认语言' },
     { group: 'general', key: 'supported_locales', value: '["zh-CN","zh-TW","en"]', label: '支持语言' },
     { group: 'general', key: 'date_format', value: '"YYYY-MM-DD"', label: '日期格式' },
     { group: 'general', key: 'timezone', value: '"Asia/Taipei"', label: '默认时区' },
@@ -369,13 +317,19 @@ async function main() {
     { group: 'notification', key: 'digest_interval', value: '60', label: '通知摘要间隔(分钟)' },
   ]
   for (const cfg of configs) {
-    await prisma.systemConfig.upsert({
-      where: {
-        tenantId_group_key: { tenantId: null, group: cfg.group, key: cfg.key },
-      },
-      update: { value: cfg.value },
-      create: { tenantId: null, group: cfg.group, key: cfg.key, value: cfg.value, label: cfg.label },
+    const existingCfg = await prisma.systemConfig.findFirst({
+      where: { tenantId: null, group: cfg.group, key: cfg.key },
     })
+    if (existingCfg) {
+      await prisma.systemConfig.update({
+        where: { id: existingCfg.id },
+        data: { value: cfg.value },
+      })
+    } else {
+      await prisma.systemConfig.create({
+        data: { tenantId: null, group: cfg.group, key: cfg.key, value: cfg.value, label: cfg.label },
+      })
+    }
   }
   console.log(`✅ 创建 ${configs.length} 个系统配置`)
 

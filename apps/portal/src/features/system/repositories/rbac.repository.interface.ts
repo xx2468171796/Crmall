@@ -11,7 +11,7 @@ export interface IRbacRepository {
   // Role CRUD
   getRoles(filters: RoleFilters): Promise<PaginatedResult<RoleVO>>
   getRoleById(id: string): Promise<RoleDetailVO | null>
-  getRoleByName(name: string): Promise<RoleVO | null>
+  getRoleByName(name: string, tenantId?: string): Promise<RoleVO | null>
   createRole(dto: CreateRoleDTO, tenantId?: string): Promise<RoleVO>
   updateRole(id: string, dto: UpdateRoleDTO): Promise<RoleVO>
   deleteRole(id: string): Promise<void>

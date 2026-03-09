@@ -80,7 +80,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           for (const ur of user.roles) {
             for (const rp of ur.role.permissions) {
               const perm = `${rp.permission.module}:${rp.permission.action}:${rp.permission.resource}`
-              const scope = (rp as Record<string, unknown>).dataScope as string || 'all'
+              const scope = (rp as Record<string, unknown>).dataScope as string || 'own'
               const existing = dataScopes[perm]
               // 保留最大范围: all > department > own
               if (!existing || scopePriority(scope) > scopePriority(existing)) {

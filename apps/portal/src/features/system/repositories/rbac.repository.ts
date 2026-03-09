@@ -162,9 +162,9 @@ export class RbacRepository implements IRbacRepository {
     }
   }
 
-  async getRoleByName(name: string): Promise<RoleVO | null> {
-    const role = await this.db.role.findUnique({
-      where: { name },
+  async getRoleByName(name: string, tenantId?: string): Promise<RoleVO | null> {
+    const role = await this.db.role.findFirst({
+      where: { name, tenantId: tenantId ?? null },
       include: { _count: { select: { permissions: true, users: true } } },
     })
     if (!role) return null
