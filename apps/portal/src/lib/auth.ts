@@ -9,6 +9,15 @@ import { compare } from 'bcryptjs'
 import { prisma } from '@twcrm/db'
 import type { SessionUser } from '@twcrm/shared'
 
+function scopePriority(scope: string): number {
+  switch (scope) {
+    case 'all': return 3
+    case 'department': return 2
+    case 'own': return 1
+    default: return 0
+  }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
   debug: process.env.NODE_ENV === 'development',
@@ -66,6 +75,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               )
             ),
           ]
+          // 构建数据范围映射
+          const dataScopes: Record<string, string> = {}
+          for (const ur of user.roles) {
+            for (const rp of ur.role.permissions) {
+              const perm = `${rp.permission.module}:${rp.permission.action}:${rp.permission.resource}`
+              const scope = (rp as Record<string, unknown>).dataScope as string || 'all'
+              const existing = dataScopes[perm]
+              // 保留最大范围: all > department > own
+              if (!existing || scopePriority(scope) > scopePriority(existing)) {
+                dataScopes[perm] = scope
+              }
+            }
+          }
+
           const isPlatform = user.tenant.parentId === null
 
           return {
@@ -76,8 +99,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             tenantId: user.tenantId,
             tenantCode: user.tenant.code,
             tenantName: user.tenant.name,
+            departmentId: user.departmentId,
             roles,
             permissions,
+            dataScopes,
             locale: user.locale,
             isPlatform,
           }
@@ -103,8 +128,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.tenantId = u.tenantId
         token.tenantCode = u.tenantCode
         token.tenantName = u.tenantName
+        token.departmentId = u.departmentId
         token.roles = u.roles
         token.permissions = u.permissions
+        token.dataScopes = u.dataScopes
         token.locale = u.locale
         token.isPlatform = u.isPlatform
       }
@@ -118,8 +145,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         u.tenantId = token.tenantId as string
         u.tenantCode = token.tenantCode as string
         u.tenantName = token.tenantName as string
+        u.departmentId = (token.departmentId as string) ?? null
         u.roles = token.roles as string[]
         u.permissions = token.permissions as string[]
+        u.dataScopes = (token.dataScopes as Record<string, string>) ?? {}
         u.locale = token.locale as SessionUser['locale']
         u.isPlatform = token.isPlatform as boolean
       }

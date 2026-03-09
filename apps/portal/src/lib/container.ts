@@ -6,7 +6,7 @@
 import { prisma } from '@twcrm/db'
 import { ConfigService } from './services/config.service'
 import { RbacService } from './services/rbac.service'
-import type { IConfigService } from '@twcrm/shared'
+import type { IConfigService, SessionUser } from '@twcrm/shared'
 import type { IRbacService } from './services/rbac.service'
 
 // ---- 单例 ----
@@ -43,9 +43,19 @@ export async function requireAnyPermission(permissions: string[]) {
   return getRbacService().requireAnyPermission(permissions)
 }
 
+/** 校验所有权限 */
+export async function requireAllPermissions(permissions: string[]) {
+  return getRbacService().requireAllPermissions(permissions)
+}
+
 /** 校验总部 */
 export async function requirePlatform() {
   return getRbacService().requirePlatform()
+}
+
+/** 获取数据范围 */
+export function getDataScope(user: SessionUser, permission: string): string {
+  return getRbacService().getDataScope(user, permission)
 }
 
 // ---- 业务 Service 工厂 ----

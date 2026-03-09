@@ -7,7 +7,9 @@ export {
   requireAuth,
   requirePermission,
   requireAnyPermission,
+  requireAllPermissions,
   requirePlatform,
+  getDataScope,
 } from './container'
 
 // 纯函数保留（组件中使用）
@@ -21,4 +23,9 @@ export function hasPermission(user: SessionUser, permission: string): boolean {
 
 export function hasRole(user: SessionUser, role: string): boolean {
   return user.roles.includes(role)
+}
+
+export function getDataScopeForUser(user: SessionUser, permission: string): string {
+  if (user.roles.includes(ROLES.PLATFORM_ADMIN)) return 'all'
+  return user.dataScopes?.[permission] ?? 'own'
 }
