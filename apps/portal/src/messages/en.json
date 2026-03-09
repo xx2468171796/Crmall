@@ -95,7 +95,8 @@
     "platform": "Platform",
     "notifications": "Notifications",
     "announcements": "Announcements",
-    "system_config": "System Config"
+    "system_config": "System Config",
+    "platform_section": "Platform"
   },
   "dashboard": {
     "welcome": "Welcome back",
@@ -163,5 +164,33 @@
     "tracking_no": "Tracking No.",
     "shipped_at": "Shipped At",
     "received_at": "Received At"
+  },
+  "rbac": {
+    "roles": "Roles",
+    "role_name": "Role Name",
+    "display_name": "Display Name",
+    "description": "Description",
+    "level": "Level",
+    "is_system": "System Role",
+    "permission_count": "Permissions",
+    "user_count": "Users",
+    "create_role": "Create Role",
+    "edit_role": "Edit Role",
+    "delete_role": "Delete Role",
+    "assign_permissions": "Assign Permissions",
+    "permissions": "Permissions",
+    "module": "Module",
+    "action": "Action",
+    "resource": "Resource",
+    "data_scope": "Data Scope",
+    "scope_all": "All Data",
+    "scope_department": "Department",
+    "scope_own": "Own Data",
+    "users": "User Roles",
+    "assign_roles": "Assign Roles",
+    "remove_role": "Remove Role",
+    "system_role_tip": "System roles cannot be modified",
+    "confirm_delete": "Are you sure you want to delete this role? This action cannot be undone.",
+    "has_users_tip": "This role has active users, please remove them first"
   }
 }
