@@ -191,6 +191,9 @@
     "remove_role": "移除角色",
     "system_role_tip": "系統內建角色不可修改",
     "confirm_delete": "確認刪除此角色？此操作不可恢復。",
-    "has_users_tip": "該角色下還有用戶，請先移除"
+    "has_users_tip": "該角色下還有用戶，請先移除",
+    "system_roles": "系統角色",
+    "custom_roles": "自訂角色",
+    "custom": "自訂"
   }
 }

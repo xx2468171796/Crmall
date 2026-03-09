@@ -191,6 +191,9 @@
     "remove_role": "Remove Role",
     "system_role_tip": "System roles cannot be modified",
     "confirm_delete": "Are you sure you want to delete this role? This action cannot be undone.",
-    "has_users_tip": "This role has active users, please remove them first"
+    "has_users_tip": "This role has active users, please remove them first",
+    "system_roles": "System Roles",
+    "custom_roles": "Custom Roles",
+    "custom": "Custom"
   }
 }
