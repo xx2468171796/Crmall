@@ -95,7 +95,8 @@
     "platform": "總部管理",
     "notifications": "通知中心",
     "announcements": "公告管理",
-    "system_config": "系統設定"
+    "system_config": "系統設定",
+    "platform_section": "平台管理"
   },
   "dashboard": {
     "welcome": "歡迎回來",
@@ -163,5 +164,33 @@
     "tracking_no": "運單號",
     "shipped_at": "出貨時間",
     "received_at": "收貨時間"
+  },
+  "rbac": {
+    "roles": "角色列表",
+    "role_name": "角色名稱",
+    "display_name": "顯示名稱",
+    "description": "描述",
+    "level": "等級",
+    "is_system": "系統角色",
+    "permission_count": "權限數",
+    "user_count": "用戶數",
+    "create_role": "建立角色",
+    "edit_role": "編輯角色",
+    "delete_role": "刪除角色",
+    "assign_permissions": "分配權限",
+    "permissions": "權限列表",
+    "module": "模組",
+    "action": "操作",
+    "resource": "資源",
+    "data_scope": "資料範圍",
+    "scope_all": "全部資料",
+    "scope_department": "部門資料",
+    "scope_own": "個人資料",
+    "users": "用戶角色",
+    "assign_roles": "分配角色",
+    "remove_role": "移除角色",
+    "system_role_tip": "系統內建角色不可修改",
+    "confirm_delete": "確認刪除此角色？此操作不可恢復。",
+    "has_users_tip": "該角色下還有用戶，請先移除"
   }
 }

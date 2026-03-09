@@ -23,6 +23,7 @@ import {
   BookOpen, GraduationCap, Video, Award,
   Settings, User, Shield, Bell, Activity,
   ChevronDown, ChevronRight, PanelLeftClose, PanelLeft,
+  Monitor, Building, UserCog, Key, Megaphone, Tag, ScrollText, BookMarked,
 } from 'lucide-react'
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -33,6 +34,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Target, Flag, FolderKanban, CheckSquare, ListTodo,
   BookOpen, GraduationCap, Video, Award,
   Settings, User, Shield, Bell, Activity,
+  Monitor, Building, UserCog, Key, Megaphone, Tag, ScrollText, BookMarked,
 }
 
 interface NavItem {
@@ -61,6 +63,11 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
   }
 
   const mainItems = filterByPermission(navConfig.main as unknown as NavItem[])
+  // 平台管理菜单（仅总部用户可见）
+  const platformItems = user?.isPlatform
+    ? filterByPermission(navConfig.platform as unknown as NavItem[])
+    : []
+  const settingsItems = filterByPermission(navConfig.settings as unknown as NavItem[])
 
   return (
     <aside
@@ -93,6 +100,43 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             />
           ))}
         </ul>
+
+        {/* 平台管理 */}
+        {platformItems.length > 0 && (
+          <>
+            <div className="mt-4 mb-1 px-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                {!collapsed && t('nav.platform_section')}
+              </span>
+            </div>
+            <ul className="flex flex-col gap-1">
+              {platformItems.map((item) => (
+                <SidebarItem
+                  key={item.title}
+                  item={item}
+                  pathname={pathname}
+                  collapsed={collapsed}
+                  t={t}
+                />
+              ))}
+            </ul>
+          </>
+        )}
+
+        {/* 设置 */}
+        <div className="mt-auto pt-4">
+          <ul className="flex flex-col gap-1">
+            {settingsItems.map((item) => (
+              <SidebarItem
+                key={item.title}
+                item={item}
+                pathname={pathname}
+                collapsed={collapsed}
+                t={t}
+              />
+            ))}
+          </ul>
+        </div>
       </nav>
 
       {/* 底部 — 租户信息 */}
