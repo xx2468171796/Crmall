@@ -120,3 +120,12 @@ export function createNotificationService(): INotificationService {
 export function createSystemConfigService(): ISystemConfigService {
   return new SystemConfigService(new ConfigRepository(prisma), getConfigService())
 }
+
+// RBAC 管理
+import { RbacRepository } from '@/features/system/repositories/rbac.repository'
+import { RbacManagementService } from '@/features/system/services/rbac-management.service'
+import type { IRbacManagementService } from '@/features/system/services/rbac-management.service.interface'
+
+export function createRbacManagementService(): IRbacManagementService {
+  return new RbacManagementService(new RbacRepository(prisma), getConfigService())
+}
