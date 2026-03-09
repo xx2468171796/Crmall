@@ -5,7 +5,10 @@
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '../generated/client'
 
-const connectionString = process.env.DATABASE_URL ?? 'postgresql://crmall0125:xx123654@192.168.110.246:5433/crmall0125?schema=public'
+const connectionString = process.env.DATABASE_URL
+if (!connectionString) {
+  throw new Error('DATABASE_URL environment variable is required')
+}
 const adapter = new PrismaPg({ connectionString })
 const prisma = new PrismaClient({ adapter })
 
@@ -125,8 +128,8 @@ async function main() {
   console.log(`✅ 创建 ${subsidiaries.length} 个子公司`)
 
   // 4. 创建超级管理员
-  // 密码: Admin@123456 (bcrypt hash)
-  const passwordHash = '$2b$10$.PwLX5.FFSESHa6P60fXGen82v/7Gbo8eYGdG7JhgvLKpe5pLsAva'
+  const passwordHash = process.env.SEED_PASSWORD_HASH
+    ?? '$2b$10$.PwLX5.FFSESHa6P60fXGen82v/7Gbo8eYGdG7JhgvLKpe5pLsAva'
   const admin = await prisma.user.upsert({
     where: { email: 'admin@twcrm.com' },
     update: { passwordHash },

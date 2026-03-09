@@ -10,7 +10,10 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL ?? 'postgresql://crmall0125:xx123654@192.168.110.246:5433/crmall0125?schema=public'
+  const connectionString = process.env.DATABASE_URL
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is required')
+  }
   const adapter = new PrismaPg({ connectionString })
   return new PrismaClient({
     adapter,

@@ -5,7 +5,7 @@
   "description": "台湾智能家居 CRM 系统 — 集团总部 + 多子公司",
   "packageManager": "pnpm@10.30.2",
   "engines": {
-    "node": ">=24.0.0",
+    "node": ">=22.0.0",
     "pnpm": ">=10.0.0"
   },
   "scripts": {
