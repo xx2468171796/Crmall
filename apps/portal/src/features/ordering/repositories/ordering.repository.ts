@@ -309,6 +309,8 @@ export class OrderRepository implements IOrderRepository {
     const where: Record<string, unknown> = {}
     if (filters.tenantId) where.tenantId = filters.tenantId
     if (filters.status) where.status = filters.status
+    if (filters.createdBy) where.createdBy = filters.createdBy
+    if (filters.departmentId) where.departmentId = filters.departmentId
     if (filters.search) {
       where.OR = [{ orderNo: { contains: filters.search, mode: 'insensitive' } }]
     }

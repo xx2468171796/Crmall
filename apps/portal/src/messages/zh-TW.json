@@ -34,7 +34,9 @@
     "notifications": "通知",
     "profile": "個人資料",
     "logout": "登出",
-    "save_success": "儲存成功"
+    "save_success": "儲存成功",
+    "language_preference": "語言偏好",
+    "language_updated": "語言已更新"
   },
   "auth": {
     "login": "登入",
@@ -46,7 +48,17 @@
     "login_success": "登入成功",
     "login_failed": "登入失敗，請檢查電子郵件和密碼",
     "unauthorized": "未登入，請先登入",
-    "forbidden": "無權限執行此操作"
+    "forbidden": "無權限執行此操作",
+    "register": "註冊",
+    "register_success": "註冊成功，請登入",
+    "register_failed": "註冊失敗",
+    "name": "姓名",
+    "confirm_password": "確認密碼",
+    "password_mismatch": "密碼不一致",
+    "language": "語言",
+    "email_exists": "此電子郵件已被註冊",
+    "have_account": "已有帳號？",
+    "no_account": "還沒有帳號？"
   },
   "nav": {
     "dashboard": "工作台",

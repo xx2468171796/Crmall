@@ -4,16 +4,19 @@ import { useSession } from 'next-auth/react'
 import { useTranslations } from 'next-intl'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { logoutAction } from '@/features/auth/actions/auth.action'
-import type { SessionUser } from '@twcrm/shared'
+import { logoutAction, updateLocaleAction } from '@/features/auth/actions/auth.action'
+import { LocaleSelect } from '@/components/ui/locale-select'
+import type { SessionUser, Locale } from '@twcrm/shared'
 import { Bell, LogOut, Sun, Moon, User } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { useRouter } from 'next/navigation'
 
 export function Header() {
   const t = useTranslations('common')
-  const { data: session } = useSession()
+  const { data: session, update } = useSession()
   const user = session?.user as unknown as SessionUser | undefined
   const { theme, setTheme } = useTheme()
+  const router = useRouter()
 
   return (
     <header className="flex h-14 items-center justify-between border-b px-6 bg-[var(--background)]">
@@ -22,6 +25,23 @@ export function Header() {
 
       {/* 右侧 — 工具栏 */}
       <div className="flex items-center gap-2">
+        {/* 语言切换 */}
+        {user && (
+          <LocaleSelect
+            compact
+            value={user.locale}
+            onChange={async (locale: Locale) => {
+              const formData = new FormData()
+              formData.set('userId', user.id)
+              formData.set('locale', locale)
+              await updateLocaleAction({ success: true, data: null }, formData)
+              await update()
+              router.refresh()
+            }}
+            ariaLabel={t('language_preference')}
+          />
+        )}
+
         {/* 主题切换 */}
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}

@@ -100,6 +100,10 @@ export interface OrderFilters {
   status?: string
   page?: number
   perPage?: number
+  /** 数据范围过滤: 仅查询指定用户创建的订单 */
+  createdBy?: string
+  /** 数据范围过滤: 仅查询指定部门的订单 */
+  departmentId?: string
 }
 
 // ---- 物流 ----

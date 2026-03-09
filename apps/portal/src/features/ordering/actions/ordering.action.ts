@@ -5,6 +5,7 @@ import {
   createCatalogService, createCartService,
   createOrderService, createAccountService,
 } from '@/lib/container'
+import { getDataScopeFilter } from '@/lib/data-scope'
 import {
   addToCartSchema, updateCartSchema,
   createOrderSchema,
@@ -128,9 +129,11 @@ export async function getOrdersAction(
   try {
     const user = await requirePermission('ordering:read:order')
     const service = createOrderService()
+    const scopeFilter = getDataScopeFilter(user, 'ordering:read:order')
+    const scopedFilters = { ...filters, ...scopeFilter }
     const result = user.isPlatform
       ? await service.getAllOrders(filters)
-      : await service.getOrders(user.tenantId, filters)
+      : await service.getOrders(user.tenantId, scopedFilters)
     return ok(result)
   } catch (e) {
     if (e instanceof AppError) return fail(e.message, e.code)
