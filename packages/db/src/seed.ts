@@ -260,7 +260,7 @@ async function main() {
   for (const cfg of configs) {
     await prisma.systemConfig.upsert({
       where: {
-        tenantId_group_key: { tenantId: '', group: cfg.group, key: cfg.key },
+        tenantId_group_key: { tenantId: null, group: cfg.group, key: cfg.key },
       },
       update: { value: cfg.value },
       create: { tenantId: null, group: cfg.group, key: cfg.key, value: cfg.value, label: cfg.label },

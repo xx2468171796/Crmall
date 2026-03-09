@@ -28,4 +28,5 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export { PrismaClient }
+export { withTenant } from './tenant-middleware'
 export * from '../generated/client'
