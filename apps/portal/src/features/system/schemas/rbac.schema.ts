@@ -7,6 +7,7 @@ export const createRoleSchema = z.object({
   level: z.number().int().min(0).max(100).optional().default(50),
   permissions: z.array(z.object({
     permissionId: z.string().min(1),
+    dataScope: z.enum(['all', 'department', 'own']).optional().default('all'),
   })).optional().default([]),
 })
 
@@ -20,6 +21,7 @@ export const assignPermissionsSchema = z.object({
   roleId: z.string().min(1),
   permissions: z.array(z.object({
     permissionId: z.string().min(1),
+    dataScope: z.enum(['all', 'department', 'own']).default('all'),
   })),
 })
 

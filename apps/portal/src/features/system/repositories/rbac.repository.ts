@@ -19,6 +19,7 @@ import type {
 
 interface RoleRow {
   id: string
+  tenantId: string | null
   name: string
   displayName: string
   description: string | null
@@ -32,6 +33,7 @@ interface RoleDetailRow extends Omit<RoleRow, '_count'> {
   permissions: Array<{
     id: string
     permissionId: string
+    dataScope: string
     permission: {
       module: string
       action: string
@@ -67,6 +69,7 @@ const PERMISSION_MODULE_LABELS: Record<string, string> = {
 function toRoleVO(r: RoleRow): RoleVO {
   return {
     id: r.id,
+    tenantId: r.tenantId,
     name: r.name,
     displayName: r.displayName,
     description: r.description,
@@ -138,6 +141,7 @@ export class RbacRepository implements IRbacRepository {
     const r = role as unknown as RoleDetailRow
     return {
       id: r.id,
+      tenantId: r.tenantId,
       name: r.name,
       displayName: r.displayName,
       description: r.description,
@@ -153,6 +157,7 @@ export class RbacRepository implements IRbacRepository {
         action: rp.permission.action,
         resource: rp.permission.resource,
         description: rp.permission.description,
+        dataScope: rp.dataScope,
       })),
     }
   }
@@ -166,9 +171,10 @@ export class RbacRepository implements IRbacRepository {
     return toRoleVO(role as unknown as RoleRow)
   }
 
-  async createRole(dto: CreateRoleDTO): Promise<RoleVO> {
+  async createRole(dto: CreateRoleDTO, tenantId?: string): Promise<RoleVO> {
     const role = await this.db.role.create({
       data: {
+        tenantId: tenantId ?? null,
         name: dto.name,
         displayName: dto.displayName,
         description: dto.description,
@@ -177,6 +183,7 @@ export class RbacRepository implements IRbacRepository {
         permissions: dto.permissions?.length ? {
           create: dto.permissions.map((p) => ({
             permissionId: p.permissionId,
+            dataScope: p.dataScope ?? 'all',
           })),
         } : undefined,
       },
@@ -237,16 +244,17 @@ export class RbacRepository implements IRbacRepository {
           data: dto.permissions.map((p) => ({
             roleId: dto.roleId,
             permissionId: p.permissionId,
+            dataScope: p.dataScope,
           })),
         })
       }
     })
   }
 
-  async getRolePermissions(roleId: string): Promise<{ permissionId: string }[]> {
+  async getRolePermissions(roleId: string): Promise<{ permissionId: string; dataScope: string }[]> {
     const rps = await this.db.rolePermission.findMany({
       where: { roleId },
-      select: { permissionId: true },
+      select: { permissionId: true, dataScope: true },
     })
     return rps
   }

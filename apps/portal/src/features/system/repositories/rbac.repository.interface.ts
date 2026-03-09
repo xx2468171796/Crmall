@@ -12,7 +12,7 @@ export interface IRbacRepository {
   getRoles(filters: RoleFilters): Promise<PaginatedResult<RoleVO>>
   getRoleById(id: string): Promise<RoleDetailVO | null>
   getRoleByName(name: string): Promise<RoleVO | null>
-  createRole(dto: CreateRoleDTO): Promise<RoleVO>
+  createRole(dto: CreateRoleDTO, tenantId?: string): Promise<RoleVO>
   updateRole(id: string, dto: UpdateRoleDTO): Promise<RoleVO>
   deleteRole(id: string): Promise<void>
 
@@ -23,7 +23,7 @@ export interface IRbacRepository {
 
   // Role-Permission
   assignPermissions(dto: AssignPermissionsDTO): Promise<void>
-  getRolePermissions(roleId: string): Promise<{ permissionId: string }[]>
+  getRolePermissions(roleId: string): Promise<{ permissionId: string; dataScope: string }[]>
 
   // User-Role
   getUsersWithRoles(filters: UserFilters): Promise<PaginatedResult<UserRoleVO>>

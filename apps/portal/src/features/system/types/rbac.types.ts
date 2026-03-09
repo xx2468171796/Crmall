@@ -6,6 +6,7 @@
 
 export interface RoleVO {
   id: string
+  tenantId: string | null
   name: string
   displayName: string
   description: string | null
@@ -27,6 +28,7 @@ export interface RolePermissionVO {
   action: string
   resource: string
   description: string | null
+  dataScope: string
 }
 
 export interface CreateRoleDTO {
@@ -34,7 +36,7 @@ export interface CreateRoleDTO {
   displayName: string
   description?: string
   level?: number
-  permissions?: { permissionId: string }[]
+  permissions?: { permissionId: string; dataScope?: string }[]
 }
 
 export interface UpdateRoleDTO {
@@ -45,7 +47,7 @@ export interface UpdateRoleDTO {
 
 export interface AssignPermissionsDTO {
   roleId: string
-  permissions: { permissionId: string }[]
+  permissions: { permissionId: string; dataScope: string }[]
 }
 
 export interface RoleFilters {

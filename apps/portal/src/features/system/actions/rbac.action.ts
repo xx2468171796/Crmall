@@ -48,10 +48,10 @@ export async function createRoleAction(
   input: unknown
 ): Promise<ActionResult<RoleVO>> {
   try {
-    await requirePermission('platform:create:role')
+    const user = await requirePermission('platform:create:role')
     const dto = createRoleSchema.parse(input)
     const service = createRbacManagementService()
-    const result = await service.createRole(dto)
+    const result = await service.createRole(dto, user.tenantId)
     revalidatePath('/platform/roles')
     return ok(result)
   } catch (e) {

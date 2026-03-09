@@ -11,7 +11,7 @@ export interface IRbacManagementService {
   // Roles
   getRoles(filters: RoleFilters): Promise<PaginatedResult<RoleVO>>
   getRoleById(id: string): Promise<RoleDetailVO>
-  createRole(dto: CreateRoleDTO): Promise<RoleVO>
+  createRole(dto: CreateRoleDTO, tenantId?: string): Promise<RoleVO>
   updateRole(id: string, dto: UpdateRoleDTO): Promise<RoleVO>
   deleteRole(id: string): Promise<void>
 

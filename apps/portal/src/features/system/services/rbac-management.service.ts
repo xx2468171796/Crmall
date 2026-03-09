@@ -30,10 +30,10 @@ export class RbacManagementService implements IRbacManagementService {
     return role
   }
 
-  async createRole(dto: CreateRoleDTO): Promise<RoleVO> {
+  async createRole(dto: CreateRoleDTO, tenantId?: string): Promise<RoleVO> {
     const existing = await this.rbacRepo.getRoleByName(dto.name)
     if (existing) throw new DuplicateError('角色', 'name')
-    return this.rbacRepo.createRole(dto)
+    return this.rbacRepo.createRole(dto, tenantId)
   }
 
   async updateRole(id: string, dto: UpdateRoleDTO): Promise<RoleVO> {
