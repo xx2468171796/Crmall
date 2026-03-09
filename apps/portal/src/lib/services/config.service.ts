@@ -88,11 +88,11 @@ export class ConfigService implements IConfigService {
     tenantId?: string,
     label?: string,
   ): Promise<void> {
-    const tid = tenantId ?? ''
+    const tid = tenantId ?? null
     await this.prisma.systemConfig.upsert({
       where: { tenantId_group_key: { tenantId: tid, group, key } },
       update: { value },
-      create: { tenantId: tid || null, group, key, value, label },
+      create: { tenantId: tid, group, key, value, label },
     })
     await this.invalidateCache(group, tenantId)
   }
