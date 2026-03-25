@@ -103,7 +103,7 @@ export interface OrderVO {
   createdAt: string
   updatedAt: string
   items: OrderItemVO[]
-  shipment: ShipmentVO | null
+  shipments: ShipmentVO[]
 }
 
 export interface OrderItemVO {
@@ -136,6 +136,7 @@ export interface OrderFilters {
 
 export interface ShipmentVO {
   id: string
+  shipmentNo: string
   orderId: string
   carrier: string | null
   trackingNo: string | null
@@ -144,12 +145,27 @@ export interface ShipmentVO {
   receivedAt: string | null
   status: string
   remark: string | null
+  items: ShipmentItemVO[]
+}
+
+export interface ShipmentItemVO {
+  id: string
+  orderItemId: string
+  quantity: number
+  /** 来自 OrderItem 的产品名快照 */
+  name: string
+  sku: string
+  image: string | null
 }
 
 export interface ShipOrderDTO {
   carrier: string
   trackingNo: string
   remark?: string
+  items: Array<{
+    orderItemId: string
+    quantity: number
+  }>
 }
 
 // ---- 账户 ----
@@ -160,4 +176,15 @@ export interface TenantAccountVO {
   balance: number
   creditLimit: number
   currency: string
+}
+
+export interface AccountTransactionVO {
+  id: string
+  type: string
+  amount: number
+  balanceAfter: number
+  orderId: string | null
+  note: string | null
+  createdBy: string
+  createdAt: string
 }

@@ -25,6 +25,10 @@ export const shipOrderSchema = z.object({
   carrier: z.string().min(1),
   trackingNo: z.string().min(1),
   remark: z.string().max(500).optional(),
+  items: z.array(z.object({
+    orderItemId: z.string().min(1),
+    quantity: z.number().int().min(1),
+  })).min(1, '至少选择一个发货项'),
 })
 
 export type AddToCartInput = z.infer<typeof addToCartSchema>

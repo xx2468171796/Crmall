@@ -61,7 +61,7 @@ export function getDataScope(user: SessionUser, permission: string): string {
 // ---- 业务 Service 工厂 ----
 
 // B2B 订货
-import { CatalogRepository, CartRepository, OrderRepository, AccountRepository } from '@/features/ordering/repositories/ordering.repository'
+import { CatalogRepository, CartRepository, OrderRepository, ShipmentRepository, AccountRepository } from '@/features/ordering/repositories/ordering.repository'
 import { CatalogService, CartService, OrderService, AccountService } from '@/features/ordering/services/ordering.service'
 import type { ICatalogService, ICartService, IOrderService, IAccountService } from '@/features/ordering/services/ordering.service.interface'
 
@@ -79,6 +79,7 @@ export function createOrderService(): IOrderService {
     new CartRepository(prisma),
     new CatalogRepository(prisma),
     new AccountRepository(prisma),
+    new ShipmentRepository(prisma),
     getConfigService(),
   )
 }

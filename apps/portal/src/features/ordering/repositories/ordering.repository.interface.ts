@@ -7,8 +7,8 @@ import type {
   CatalogProductVO, CatalogFilters,
   CartItemVO, AddToCartDTO, UpdateCartDTO,
   OrderVO, OrderFilters,
-  ShipmentVO, ShipOrderDTO,
-  TenantAccountVO,
+  ShipmentVO,
+  TenantAccountVO, AccountTransactionVO,
 } from '../types/ordering.types'
 
 export interface ICatalogRepository {
@@ -56,13 +56,21 @@ export interface IOrderRepository {
 }
 
 export interface IShipmentRepository {
-  findByOrderId(orderId: string): Promise<ShipmentVO | null>
-  create(orderId: string, dto: ShipOrderDTO): Promise<ShipmentVO>
+  findByOrderId(orderId: string): Promise<ShipmentVO[]>
+  create(data: {
+    shipmentNo: string
+    orderId: string
+    carrier: string
+    trackingNo: string
+    remark?: string
+    items: Array<{ orderItemId: string; quantity: number }>
+  }): Promise<ShipmentVO>
   updateStatus(id: string, status: string, field?: string): Promise<void>
 }
 
 export interface IAccountRepository {
   findByTenantId(tenantId: string): Promise<TenantAccountVO | null>
+  findTransactions(tenantId: string, page?: number, perPage?: number): Promise<{ items: AccountTransactionVO[]; total: number }>
   deduct(tenantId: string, amount: number, orderId: string, createdBy: string): Promise<void>
   refund(tenantId: string, amount: number, orderId: string, createdBy: string): Promise<void>
 }

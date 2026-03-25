@@ -716,7 +716,7 @@ model Order {
   updatedAt     DateTime  @updatedAt
 
   items        OrderItem[]
-  shipment     Shipment?
+  shipments    Shipment[]
   invoices     Invoice[]
   transactions AccountTransaction[]
 
@@ -743,13 +743,16 @@ model OrderItem {
   subtotal    Decimal @db.Decimal(12, 2)
   remark      String?
 
+  shipmentItems ShipmentItem[]
+
   @@schema("ordering")
 }
 
-/// 物流
+/// 物流（一个订单可多次发货）
 model Shipment {
   id          String    @id @default(cuid())
-  orderId     String    @unique
+  shipmentNo  String    @unique /// 物流批次号 e.g. SHP-20260309-001
+  orderId     String
   order       Order     @relation(fields: [orderId], references: [id])
   carrier     String? /// 物流公司
   trackingNo  String? /// 物流单号
@@ -762,6 +765,22 @@ model Shipment {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  items       ShipmentItem[]
+
+  @@index([orderId])
+  @@schema("ordering")
+}
+
+/// 物流明细（记录每次发货包含哪些订单项及数量）
+model ShipmentItem {
+  id          String   @id @default(cuid())
+  shipmentId  String
+  shipment    Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+  quantity    Int /// 本次发货数量（可能是订单项的部分数量）
+
+  @@unique([shipmentId, orderItemId])
   @@schema("ordering")
 }
 

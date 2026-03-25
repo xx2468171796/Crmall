@@ -7,7 +7,7 @@ import type {
   CatalogProductVO, CatalogFilters,
   CartItemVO, AddToCartDTO, UpdateCartDTO,
   OrderVO, OrderFilters, CreateOrderDTO,
-  ShipOrderDTO, TenantAccountVO,
+  ShipOrderDTO, ShipmentVO, TenantAccountVO, AccountTransactionVO,
 } from '../types/ordering.types'
 
 export interface ICatalogService {
@@ -29,10 +29,12 @@ export interface IOrderService {
   getOrderById(id: string): Promise<OrderVO | null>
   confirmOrder(id: string): Promise<void>
   cancelOrder(id: string, reason: string, userId: string): Promise<void>
-  shipOrder(id: string, dto: ShipOrderDTO): Promise<void>
-  confirmReceive(id: string): Promise<void>
+  shipOrder(id: string, dto: ShipOrderDTO): Promise<ShipmentVO>
+  confirmReceive(shipmentId: string): Promise<void>
+  getShipments(orderId: string): Promise<ShipmentVO[]>
 }
 
 export interface IAccountService {
   getAccount(tenantId: string): Promise<TenantAccountVO | null>
+  getTransactions(tenantId: string, page?: number, perPage?: number): Promise<{ items: AccountTransactionVO[]; total: number }>
 }

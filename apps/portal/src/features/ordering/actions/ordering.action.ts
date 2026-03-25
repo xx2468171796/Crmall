@@ -8,7 +8,7 @@ import {
 import { getDataScopeFilter } from '@/lib/data-scope'
 import {
   addToCartSchema, updateCartSchema,
-  createOrderSchema,
+  createOrderSchema, shipOrderSchema,
 } from '../schemas/order.schema'
 import { ok, fail, type ActionResult, type PaginatedResult } from '@twcrm/shared'
 import { AppError } from '@twcrm/shared'
@@ -16,7 +16,7 @@ import { revalidatePath } from 'next/cache'
 import type {
   CatalogProductVO, CatalogFilters,
   CartItemVO, OrderVO, OrderFilters,
-  TenantAccountVO,
+  ShipmentVO, TenantAccountVO, AccountTransactionVO,
 } from '../types/ordering.types'
 
 // ---- 产品目录 ----
@@ -182,11 +182,29 @@ export async function cancelOrderAction(
   }
 }
 
-export async function confirmReceiveAction(id: string): Promise<ActionResult<null>> {
+export async function shipOrderAction(
+  orderId: string,
+  input: unknown
+): Promise<ActionResult<ShipmentVO>> {
+  try {
+    await requirePlatform()
+    const dto = shipOrderSchema.parse(input)
+    const service = createOrderService()
+    const shipment = await service.shipOrder(orderId, dto)
+    revalidatePath('/ordering/orders')
+    revalidatePath('/platform/orders')
+    return ok(shipment)
+  } catch (e) {
+    if (e instanceof AppError) return fail(e.message, e.code)
+    throw e
+  }
+}
+
+export async function confirmReceiveAction(shipmentId: string): Promise<ActionResult<null>> {
   try {
     await requirePermission('ordering:update:order')
     const service = createOrderService()
-    await service.confirmReceive(id)
+    await service.confirmReceive(shipmentId)
     revalidatePath('/ordering/orders')
     return ok(null)
   } catch (e) {
@@ -202,6 +220,20 @@ export async function getAccountAction(): Promise<ActionResult<TenantAccountVO |
     const user = await requirePermission('ordering:read:account')
     const service = createAccountService()
     const result = await service.getAccount(user.tenantId)
+    return ok(result)
+  } catch (e) {
+    if (e instanceof AppError) return fail(e.message, e.code)
+    throw e
+  }
+}
+
+export async function getTransactionsAction(
+  page?: number, perPage?: number
+): Promise<ActionResult<{ items: AccountTransactionVO[]; total: number }>> {
+  try {
+    const user = await requirePermission('ordering:read:account')
+    const service = createAccountService()
+    const result = await service.getTransactions(user.tenantId, page, perPage)
     return ok(result)
   } catch (e) {
     if (e instanceof AppError) return fail(e.message, e.code)

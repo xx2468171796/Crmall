@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { OrderService } from '../ordering.service'
-import type { IOrderRepository, ICartRepository, ICatalogRepository, IAccountRepository } from '../../repositories/ordering.repository.interface'
+import type { IOrderRepository, ICartRepository, ICatalogRepository, IShipmentRepository, IAccountRepository } from '../../repositories/ordering.repository.interface'
 import type { IConfigService } from '@twcrm/shared'
 import { BusinessRuleError, InsufficientBalanceError } from '@twcrm/shared'
 import type { CartItemVO, OrderVO } from '../../types/ordering.types'
@@ -44,7 +44,7 @@ function makeOrderVO(overrides: Partial<OrderVO> = {}): OrderVO {
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
     items: [],
-    shipment: null,
+    shipments: [],
     ...overrides,
   }
 }
@@ -76,6 +76,11 @@ describe('OrderService', () => {
     findByTenantId: ReturnType<typeof vi.fn>
     deduct: ReturnType<typeof vi.fn>
     refund: ReturnType<typeof vi.fn>
+  }
+  let mockShipmentRepo: {
+    findByOrderId: ReturnType<typeof vi.fn>
+    create: ReturnType<typeof vi.fn>
+    updateStatus: ReturnType<typeof vi.fn>
   }
   let mockConfig: {
     get: ReturnType<typeof vi.fn>
@@ -112,6 +117,11 @@ describe('OrderService', () => {
       deduct: vi.fn(),
       refund: vi.fn(),
     }
+    mockShipmentRepo = {
+      findByOrderId: vi.fn(),
+      create: vi.fn(),
+      updateStatus: vi.fn(),
+    }
     mockConfig = {
       get: vi.fn(),
       getNumber: vi.fn(),
@@ -127,6 +137,7 @@ describe('OrderService', () => {
       mockCartRepo as unknown as ICartRepository,
       mockCatalogRepo as unknown as ICatalogRepository,
       mockAccountRepo as unknown as IAccountRepository,
+      mockShipmentRepo as unknown as IShipmentRepository,
       mockConfig as unknown as IConfigService,
     )
   })
@@ -411,43 +422,43 @@ describe('OrderService', () => {
   // ---- shipOrder ----
 
   describe('shipOrder', () => {
-    it('should ship a confirmed order', async () => {
-      mockOrderRepo.findById.mockResolvedValue(makeOrderVO({ status: 'confirmed' }))
+    it('should ship a confirmed order with items', async () => {
+      const order = makeOrderVO({
+        status: 'confirmed',
+        items: [{ id: 'item-1', productId: 'p1', variantId: 'v1', name: 'Prod', sku: 'S1', image: null, variantName: 'V1', specs: {}, price: 100, quantity: 5, subtotal: 500, remark: null }],
+        shipments: [],
+      })
+      mockOrderRepo.findById.mockResolvedValue(order)
+      const createdShipment = { id: 'shp-1', shipmentNo: 'SHP-001', orderId: 'order-1', carrier: 'DHL', trackingNo: 'TRACK-123', status: 'shipped', remark: null, items: [{ id: 'si-1', orderItemId: 'item-1', quantity: 5, name: 'Prod', sku: 'S1', image: null }], shippedAt: null, receivedAt: null, createdAt: '' }
+      mockShipmentRepo.create.mockResolvedValue(createdShipment)
+      mockShipmentRepo.findByOrderId.mockResolvedValue([createdShipment])
 
-      await service.shipOrder('order-1', {
+      const result = await service.shipOrder('order-1', {
         carrier: 'DHL',
         trackingNo: 'TRACK-123',
+        items: [{ orderItemId: 'item-1', quantity: 5 }],
       })
 
-      expect(mockOrderRepo.updateStatus).toHaveBeenCalledWith('order-1', 'shipped')
+      expect(result).toEqual(createdShipment)
+      expect(mockShipmentRepo.create).toHaveBeenCalledOnce()
     })
 
-    it('should throw BusinessRuleError when order is not confirmed', async () => {
+    it('should throw BusinessRuleError when order is not confirmed or shipped', async () => {
       mockOrderRepo.findById.mockResolvedValue(makeOrderVO({ status: 'pending' }))
 
       await expect(
-        service.shipOrder('order-1', { carrier: 'DHL', trackingNo: 'T-1' }),
-      ).rejects.toThrow('只能发货已确认的订单')
+        service.shipOrder('order-1', { carrier: 'DHL', trackingNo: 'T-1', items: [{ orderItemId: 'item-1', quantity: 1 }] }),
+      ).rejects.toThrow('只能发货已确认或部分发货的订单')
     })
   })
 
   // ---- confirmReceive ----
 
   describe('confirmReceive', () => {
-    it('should confirm receipt of a shipped order', async () => {
-      mockOrderRepo.findById.mockResolvedValue(makeOrderVO({ status: 'shipped' }))
+    it('should confirm receipt of a shipment', async () => {
+      await service.confirmReceive('shipment-1')
 
-      await service.confirmReceive('order-1')
-
-      expect(mockOrderRepo.updateStatus).toHaveBeenCalledWith('order-1', 'completed')
-    })
-
-    it('should throw BusinessRuleError when order is not shipped', async () => {
-      mockOrderRepo.findById.mockResolvedValue(makeOrderVO({ status: 'confirmed' }))
-
-      await expect(service.confirmReceive('order-1')).rejects.toThrow(
-        '只能确认收货已发货的订单',
-      )
+      expect(mockShipmentRepo.updateStatus).toHaveBeenCalledWith('shipment-1', 'received', 'receivedAt')
     })
   })
 })

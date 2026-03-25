@@ -36,7 +36,8 @@
     "logout": "登出",
     "save_success": "儲存成功",
     "language_preference": "語言偏好",
-    "language_updated": "語言已更新"
+    "language_updated": "語言已更新",
+    "select_all": "全選"
   },
   "auth": {
     "login": "登入",
@@ -182,7 +183,23 @@
     "unit": "單位",
     "specs": "規格",
     "variant_name": "變體名稱",
-    "sku_code": "SKU 編碼"
+    "sku_code": "SKU 編碼",
+    "platform_orders": "訂單管理",
+    "shipment_items": "發貨商品",
+    "shipment_status_pending": "待出貨",
+    "shipment_status_shipped": "已出貨",
+    "shipment_status_in_transit": "運送中",
+    "shipment_status_delivered": "已送達",
+    "shipment_status_received": "已收貨",
+    "select_ship_items": "選擇發貨商品",
+    "remaining": "剩餘",
+    "available_amount": "可用額度",
+    "no_account": "帳戶尚未開通，請聯繫總部",
+    "transaction_history": "交易記錄",
+    "tx_type_topup": "充值",
+    "tx_type_deduct": "訂單扣款",
+    "tx_type_refund": "退款",
+    "tx_type_credit_adjust": "額度調整"
   },
   "inventory": {
     "stock": "庫存",

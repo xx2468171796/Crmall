@@ -7,7 +7,8 @@ import {
   getCatalogAction, getCartAction, addToCartAction,
   updateCartItemAction, removeCartItemAction,
   getOrdersAction, getOrderByIdAction, createOrderAction,
-  cancelOrderAction, confirmReceiveAction, getAccountAction,
+  cancelOrderAction, confirmOrderAction, shipOrderAction,
+  confirmReceiveAction, getAccountAction, getTransactionsAction,
 } from '../actions/ordering.action'
 import type { CatalogFilters, OrderFilters } from '../types/ordering.types'
 
@@ -121,11 +122,47 @@ export function useCancelOrder() {
   })
 }
 
+export function useConfirmOrder() {
+  const qc = useQueryClient()
+  const t = useTranslations('common')
+  return useMutation({
+    mutationFn: (id: string) => confirmOrderAction(id),
+    onSuccess: (r) => {
+      if (r.success) {
+        toast.success(t('operation_success'))
+        qc.invalidateQueries({ queryKey: ['orders'] })
+        qc.invalidateQueries({ queryKey: ['order'] })
+      } else toast.error(r.error)
+    },
+  })
+}
+
+export function useShipOrder() {
+  const qc = useQueryClient()
+  const t = useTranslations('common')
+  return useMutation({
+    mutationFn: ({ orderId, ...dto }: {
+      orderId: string
+      carrier: string
+      trackingNo: string
+      remark?: string
+      items: Array<{ orderItemId: string; quantity: number }>
+    }) => shipOrderAction(orderId, dto),
+    onSuccess: (r) => {
+      if (r.success) {
+        toast.success(t('operation_success'))
+        qc.invalidateQueries({ queryKey: ['orders'] })
+        qc.invalidateQueries({ queryKey: ['order'] })
+      } else toast.error(r.error)
+    },
+  })
+}
+
 export function useConfirmReceive() {
   const qc = useQueryClient()
   const t = useTranslations('common')
   return useMutation({
-    mutationFn: (id: string) => confirmReceiveAction(id),
+    mutationFn: (shipmentId: string) => confirmReceiveAction(shipmentId),
     onSuccess: (r) => {
       if (r.success) {
         toast.success(t('operation_success'))
@@ -143,5 +180,12 @@ export function useAccount() {
     queryKey: ['account'],
     queryFn: () => getAccountAction(),
     staleTime: 60 * 1000,
+  })
+}
+
+export function useTransactions(page = 1, perPage = 20) {
+  return useQuery({
+    queryKey: ['transactions', page, perPage],
+    queryFn: () => getTransactionsAction(page, perPage),
   })
 }

@@ -11,14 +11,14 @@ import {
   NotFoundError,
 } from '@twcrm/shared'
 import type {
-  ICatalogRepository, ICartRepository, IOrderRepository, IAccountRepository,
+  ICatalogRepository, ICartRepository, IOrderRepository, IShipmentRepository, IAccountRepository,
 } from '../repositories/ordering.repository.interface'
 import type { ICatalogService, ICartService, IOrderService, IAccountService } from './ordering.service.interface'
 import type {
   CatalogProductVO, CatalogFilters,
   CartItemVO, AddToCartDTO, UpdateCartDTO,
   OrderVO, OrderFilters, CreateOrderDTO,
-  ShipOrderDTO, TenantAccountVO,
+  ShipOrderDTO, ShipmentVO, TenantAccountVO,
 } from '../types/ordering.types'
 
 // ---- 产品目录 ----
@@ -88,6 +88,7 @@ export class OrderService implements IOrderService {
     private readonly cartRepo: ICartRepository,
     protected readonly catalogRepo: ICatalogRepository,
     private readonly accountRepo: IAccountRepository,
+    private readonly shipmentRepo: IShipmentRepository,
     private readonly configService: IConfigService,
   ) {}
 
@@ -196,19 +197,71 @@ export class OrderService implements IOrderService {
     }
   }
 
-  async shipOrder(id: string, _dto: ShipOrderDTO): Promise<void> {
+  async shipOrder(id: string, dto: ShipOrderDTO): Promise<ShipmentVO> {
     const order = await this.orderRepo.findById(id)
     if (!order) throw new NotFoundError('订单', id)
-    if (order.status !== 'confirmed') throw new BusinessRuleError('只能发货已确认的订单')
-    await this.orderRepo.updateStatus(id, 'shipped')
-    // shipment 创建由 action 层处理
+    if (!['confirmed', 'shipped'].includes(order.status)) {
+      throw new BusinessRuleError('只能发货已确认或部分发货的订单')
+    }
+
+    // 校验发货项：每项的 orderItemId 必须属于该订单，数量不能超过剩余可发数量
+    const orderItemMap = new Map(order.items.map((i) => [i.id, i]))
+    for (const shipItem of dto.items) {
+      const orderItem = orderItemMap.get(shipItem.orderItemId)
+      if (!orderItem) throw new BusinessRuleError(`订单项 ${shipItem.orderItemId} 不属于该订单`)
+
+      // 计算已发货数量
+      const shippedQty = order.shipments
+        .flatMap((s) => s.items)
+        .filter((si) => si.orderItemId === shipItem.orderItemId)
+        .reduce((sum, si) => sum + si.quantity, 0)
+
+      const remaining = orderItem.quantity - shippedQty
+      if (shipItem.quantity > remaining) {
+        throw new BusinessRuleError(`${orderItem.name} 剩余可发数量为 ${remaining}，不能发 ${shipItem.quantity}`)
+      }
+    }
+
+    // 生成物流批次号
+    const shipmentNo = `SHP-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+
+    const shipment = await this.shipmentRepo.create({
+      shipmentNo,
+      orderId: id,
+      carrier: dto.carrier,
+      trackingNo: dto.trackingNo,
+      remark: dto.remark,
+      items: dto.items,
+    })
+
+    // 判断是否全部发货完成，更新订单状态
+    const allShipments = await this.shipmentRepo.findByOrderId(id)
+    const totalShipped = new Map<string, number>()
+    for (const s of allShipments) {
+      for (const si of s.items) {
+        totalShipped.set(si.orderItemId, (totalShipped.get(si.orderItemId) ?? 0) + si.quantity)
+      }
+    }
+    const allItemsFullyShipped = order.items.every((item) =>
+      (totalShipped.get(item.id) ?? 0) >= item.quantity
+    )
+
+    if (allItemsFullyShipped) {
+      await this.orderRepo.updateStatus(id, 'shipped')
+    } else if (order.status === 'confirmed') {
+      // 部分发货，标记为 shipping（处理中）
+      await this.orderRepo.updateStatus(id, 'shipped')
+    }
+
+    return shipment
   }
 
-  async confirmReceive(id: string): Promise<void> {
-    const order = await this.orderRepo.findById(id)
-    if (!order) throw new NotFoundError('订单', id)
-    if (order.status !== 'shipped') throw new BusinessRuleError('只能确认收货已发货的订单')
-    await this.orderRepo.updateStatus(id, 'completed')
+  async confirmReceive(shipmentId: string): Promise<void> {
+    await this.shipmentRepo.updateStatus(shipmentId, 'received', 'receivedAt')
+  }
+
+  async getShipments(orderId: string): Promise<ShipmentVO[]> {
+    return this.shipmentRepo.findByOrderId(orderId)
   }
 }
 
@@ -222,5 +275,9 @@ export class AccountService implements IAccountService {
 
   async getAccount(tenantId: string): Promise<TenantAccountVO | null> {
     return this.accountRepo.findByTenantId(tenantId)
+  }
+
+  async getTransactions(tenantId: string, page?: number, perPage?: number) {
+    return this.accountRepo.findTransactions(tenantId, page, perPage)
   }
 }

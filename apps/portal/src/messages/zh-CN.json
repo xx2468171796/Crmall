@@ -36,7 +36,8 @@
     "logout": "退出登录",
     "save_success": "保存成功",
     "language_preference": "语言偏好",
-    "language_updated": "语言已更新"
+    "language_updated": "语言已更新",
+    "select_all": "全选"
   },
   "auth": {
     "login": "登录",

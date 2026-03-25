@@ -6,13 +6,13 @@ import type { PrismaClient } from '@twcrm/db'
 import type { PaginatedResult } from '@twcrm/shared'
 import type {
   ICatalogRepository, ICartRepository, IOrderRepository,
-  IAccountRepository,
+  IShipmentRepository, IAccountRepository,
 } from './ordering.repository.interface'
 import type {
   CatalogProductVO, CatalogFilters, ProductVariantVO,
   CartItemVO, AddToCartDTO, UpdateCartDTO,
-  OrderVO, OrderFilters,
-  TenantAccountVO,
+  OrderVO, OrderFilters, ShipmentVO,
+  TenantAccountVO, AccountTransactionVO,
 } from '../types/ordering.types'
 
 // ---- Row types for Prisma query results ----
@@ -102,8 +102,20 @@ interface OrderItemRow {
   remark: string | null
 }
 
+interface ShipmentItemRow {
+  id: string
+  orderItemId: string
+  quantity: number
+  orderItem: {
+    name: string
+    sku: string
+    image: string | null
+  }
+}
+
 interface ShipmentRow {
   id: string
+  shipmentNo: string
   orderId: string
   carrier: string | null
   trackingNo: string | null
@@ -112,6 +124,7 @@ interface ShipmentRow {
   receivedAt: Date | null
   status: string
   remark: string | null
+  items: ShipmentItemRow[]
 }
 
 interface OrderRow {
@@ -129,7 +142,7 @@ interface OrderRow {
   createdAt: Date
   updatedAt: Date
   items: OrderItemRow[]
-  shipment: ShipmentRow | null
+  shipments: ShipmentRow[]
 }
 
 interface CreateOrderData {
@@ -418,7 +431,7 @@ export class OrderRepository implements IOrderRepository {
   async findById(id: string): Promise<OrderVO | null> {
     const o = await this.prisma.order.findUnique({
       where: { id },
-      include: { items: true, shipment: true },
+      include: { items: true, shipments: { include: { items: { include: { orderItem: true } } } } },
     })
     return o ? this.toVO(o as unknown as OrderRow) : null
   }
@@ -458,7 +471,7 @@ export class OrderRepository implements IOrderRepository {
           })),
         },
       },
-      include: { items: true, shipment: true },
+      include: { items: true, shipments: { include: { items: { include: { orderItem: true } } } } },
     })
     return this.toVO(o as unknown as OrderRow)
   }
@@ -494,7 +507,7 @@ export class OrderRepository implements IOrderRepository {
         skip: (page - 1) * perPage,
         take: perPage,
         orderBy: { createdAt: 'desc' },
-        include: { items: true, shipment: true },
+        include: { items: true, shipments: { include: { items: { include: { orderItem: true } } } } },
       }),
       this.prisma.order.count({ where }),
     ])
@@ -537,17 +550,99 @@ export class OrderRepository implements IOrderRepository {
         subtotal: Number(i.subtotal),
         remark: i.remark,
       })),
-      shipment: o.shipment ? {
-        id: o.shipment.id,
-        orderId: o.shipment.orderId,
-        carrier: o.shipment.carrier,
-        trackingNo: o.shipment.trackingNo,
-        shippedAt: o.shipment.shippedAt?.toISOString() ?? null,
-        deliveredAt: o.shipment.deliveredAt?.toISOString() ?? null,
-        receivedAt: o.shipment.receivedAt?.toISOString() ?? null,
-        status: o.shipment.status,
-        remark: o.shipment.remark,
-      } : null,
+      shipments: (o.shipments ?? []).map((s: ShipmentRow) => ({
+        id: s.id,
+        shipmentNo: s.shipmentNo,
+        orderId: s.orderId,
+        carrier: s.carrier,
+        trackingNo: s.trackingNo,
+        shippedAt: s.shippedAt?.toISOString() ?? null,
+        deliveredAt: s.deliveredAt?.toISOString() ?? null,
+        receivedAt: s.receivedAt?.toISOString() ?? null,
+        status: s.status,
+        remark: s.remark,
+        items: (s.items ?? []).map((si: ShipmentItemRow) => ({
+          id: si.id,
+          orderItemId: si.orderItemId,
+          quantity: si.quantity,
+          name: si.orderItem.name,
+          sku: si.orderItem.sku,
+          image: si.orderItem.image,
+        })),
+      })),
+    }
+  }
+}
+
+// ---- 物流 ----
+
+export class ShipmentRepository implements IShipmentRepository {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async findByOrderId(orderId: string): Promise<ShipmentVO[]> {
+    const shipments = await this.prisma.shipment.findMany({
+      where: { orderId },
+      include: { items: { include: { orderItem: true } } },
+      orderBy: { createdAt: 'desc' },
+    })
+    return shipments.map((s) => this.toVO(s as unknown as ShipmentRow))
+  }
+
+  async create(data: {
+    shipmentNo: string
+    orderId: string
+    carrier: string
+    trackingNo: string
+    remark?: string
+    items: Array<{ orderItemId: string; quantity: number }>
+  }): Promise<ShipmentVO> {
+    const s = await this.prisma.shipment.create({
+      data: {
+        shipmentNo: data.shipmentNo,
+        orderId: data.orderId,
+        carrier: data.carrier,
+        trackingNo: data.trackingNo,
+        remark: data.remark,
+        status: 'shipped',
+        shippedAt: new Date(),
+        items: {
+          create: data.items.map((i) => ({
+            orderItemId: i.orderItemId,
+            quantity: i.quantity,
+          })),
+        },
+      },
+      include: { items: { include: { orderItem: true } } },
+    })
+    return this.toVO(s as unknown as ShipmentRow)
+  }
+
+  async updateStatus(id: string, status: string, field?: string): Promise<void> {
+    const data: Record<string, unknown> = { status }
+    if (field) data[field] = new Date()
+    await this.prisma.shipment.update({ where: { id }, data })
+  }
+
+  private toVO(s: ShipmentRow): ShipmentVO {
+    return {
+      id: s.id,
+      shipmentNo: s.shipmentNo,
+      orderId: s.orderId,
+      carrier: s.carrier,
+      trackingNo: s.trackingNo,
+      shippedAt: s.shippedAt?.toISOString() ?? null,
+      deliveredAt: s.deliveredAt?.toISOString() ?? null,
+      receivedAt: s.receivedAt?.toISOString() ?? null,
+      status: s.status,
+      remark: s.remark,
+      items: (s.items ?? []).map((si: ShipmentItemRow) => ({
+        id: si.id,
+        orderItemId: si.orderItemId,
+        quantity: si.quantity,
+        name: si.orderItem.name,
+        sku: si.orderItem.sku,
+        image: si.orderItem.image,
+      })),
     }
   }
 }
@@ -560,6 +655,35 @@ export class AccountRepository implements IAccountRepository {
   async findByTenantId(tenantId: string): Promise<TenantAccountVO | null> {
     const a = await this.prisma.tenantAccount.findUnique({ where: { tenantId } })
     return a ? { id: a.id, tenantId: a.tenantId, balance: Number(a.balance), creditLimit: Number(a.creditLimit), currency: a.currency } : null
+  }
+
+  async findTransactions(tenantId: string, page = 1, perPage = 20): Promise<{ items: AccountTransactionVO[]; total: number }> {
+    const account = await this.prisma.tenantAccount.findUnique({ where: { tenantId } })
+    if (!account) return { items: [], total: 0 }
+
+    const [items, total] = await Promise.all([
+      this.prisma.accountTransaction.findMany({
+        where: { accountId: account.id },
+        skip: (page - 1) * perPage,
+        take: perPage,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.accountTransaction.count({ where: { accountId: account.id } }),
+    ])
+
+    return {
+      items: items.map((t) => ({
+        id: t.id,
+        type: t.type,
+        amount: Number(t.amount),
+        balanceAfter: Number(t.balanceAfter),
+        orderId: t.orderId,
+        note: t.note,
+        createdBy: t.createdBy,
+        createdAt: t.createdAt.toISOString(),
+      })),
+      total,
+    }
   }
 
   async deduct(tenantId: string, amount: number, orderId: string, createdBy: string): Promise<void> {

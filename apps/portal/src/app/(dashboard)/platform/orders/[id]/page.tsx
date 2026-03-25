@@ -6,16 +6,16 @@ import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import {
   ArrowLeft, Package, Truck, CheckCircle2, XCircle, Clock,
-  FileText,
+  FileText, Send,
 } from 'lucide-react'
-import { useOrderDetail, useCancelOrder, useConfirmReceive } from '@/features/ordering/hooks/use-ordering'
+import {
+  useOrderDetail, useConfirmOrder, useShipOrder, useCancelOrder,
+} from '@/features/ordering/hooks/use-ordering'
 import type { OrderVO, OrderItemVO, ShipmentVO } from '@/features/ordering/types/ordering.types'
 
-/** 订单状态步骤 */
 const ORDER_STEPS = ['pending', 'confirmed', 'shipped', 'completed'] as const
 
-/** 订单详情页 */
-export default function OrderDetailPage() {
+export default function PlatformOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const t = useTranslations('ordering')
   const tc = useTranslations('common')
@@ -36,7 +36,7 @@ export default function OrderDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-[var(--muted-foreground)]">
         <p>{tc('no_data')}</p>
-        <Link href="/ordering/orders" className="mt-4 text-sm text-[#8b5cf6] hover:underline">
+        <Link href="/platform/orders" className="mt-4 text-sm text-[#8b5cf6] hover:underline">
           {tc('back')}
         </Link>
       </div>
@@ -45,7 +45,6 @@ export default function OrderDetailPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
-      {/* 返回 + 标题 */}
       <div className="flex items-center gap-3">
         <button
           onClick={() => router.back()}
@@ -60,14 +59,13 @@ export default function OrderDetailPage() {
           </h1>
           <p className="text-xs text-[var(--muted-foreground)]">
             {tc('created_at')}: {new Date(order.createdAt).toLocaleString('zh-CN')}
+            &nbsp;|&nbsp;Tenant: {order.tenantId.slice(0, 8)}...
           </p>
         </div>
       </div>
 
-      {/* 状态进度条 */}
       {order.status !== 'cancelled' && <OrderProgress status={order.status} />}
 
-      {/* 取消状态 */}
       {order.status === 'cancelled' && (
         <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30 p-4 flex items-start gap-3">
           <XCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
@@ -90,7 +88,7 @@ export default function OrderDetailPage() {
         </div>
         <div className="divide-y">
           {order.items.map((item) => (
-            <OrderItemRow key={item.id} item={item} />
+            <ItemRow key={item.id} item={item} order={order} />
           ))}
         </div>
         <div className="border-t px-4 py-3 flex justify-end">
@@ -103,15 +101,20 @@ export default function OrderDetailPage() {
         </div>
       </section>
 
-      {/* 物流信息 */}
+      {/* 发货表单 */}
+      {['confirmed', 'shipped'].includes(order.status) && (
+        <ShipForm order={order} />
+      )}
+
+      {/* 物流历史 */}
       {order.shipments.length > 0 && (
         <section className="flex flex-col gap-3">
           <h2 className="font-semibold flex items-center gap-2">
             <Truck className="h-4 w-4" />
             {t('shipment')} ({order.shipments.length})
           </h2>
-          {order.shipments.map((shipment) => (
-            <ShipmentCard key={shipment.id} shipment={shipment} />
+          {order.shipments.map((s) => (
+            <ShipmentCard key={s.id} shipment={s} />
           ))}
         </section>
       )}
@@ -127,17 +130,15 @@ export default function OrderDetailPage() {
         </section>
       )}
 
-      {/* 操作按钮 */}
-      <OrderActions order={order} />
+      {/* 操作区 */}
+      <PlatformActions order={order} />
     </div>
   )
 }
 
-/** 订单进度条 */
 function OrderProgress({ status }: { status: string }) {
   const t = useTranslations('ordering')
   const currentIdx = ORDER_STEPS.indexOf(status as typeof ORDER_STEPS[number])
-
   const icons = [Clock, CheckCircle2, Truck, CheckCircle2]
 
   return (
@@ -178,8 +179,13 @@ function OrderProgress({ status }: { status: string }) {
   )
 }
 
-/** 商品行 */
-function OrderItemRow({ item }: { item: OrderItemVO }) {
+function ItemRow({ item, order }: { item: OrderItemVO; order: OrderVO }) {
+  // 计算已发货数量
+  const shippedQty = order.shipments
+    .flatMap((s) => s.items)
+    .filter((si) => si.orderItemId === item.id)
+    .reduce((sum, si) => sum + si.quantity, 0)
+
   return (
     <div className="flex items-center gap-4 px-4 py-3">
       <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-[var(--muted)]">
@@ -194,35 +200,193 @@ function OrderItemRow({ item }: { item: OrderItemVO }) {
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{item.name}</p>
         <p className="text-xs text-[var(--muted-foreground)]">{item.sku}</p>
-        {/* 变体信息 */}
         {item.variantName && (
           <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{item.variantName}</p>
         )}
-        {item.specs && Object.keys(item.specs).length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {Object.entries(item.specs).map(([key, value]) => (
-              <span
-                key={key}
-                className="inline-flex rounded bg-[var(--muted)] px-1.5 py-0.5 text-[10px] text-[var(--muted-foreground)]"
-              >
-                {key}: {value}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
       <div className="text-right shrink-0">
-        <p className="text-sm">× {item.quantity}</p>
+        <p className="text-sm">
+          x {item.quantity}
+          {shippedQty > 0 && (
+            <span className="text-xs text-green-600 ml-1">({shippedQty} shipped)</span>
+          )}
+        </p>
         <p className="text-sm font-semibold">NT$ {item.subtotal.toLocaleString()}</p>
       </div>
     </div>
   )
 }
 
-/** 物流卡片 — 每个发货批次 */
+/** 发货表单 */
+function ShipForm({ order }: { order: OrderVO }) {
+  const t = useTranslations('ordering')
+  const tc = useTranslations('common')
+  const shipOrder = useShipOrder()
+
+  const [carrier, setCarrier] = useState('')
+  const [trackingNo, setTrackingNo] = useState('')
+  const [remark, setRemark] = useState('')
+  const [selectedItems, setSelectedItems] = useState<Record<string, number>>({})
+
+  // 计算每个项的剩余可发数量
+  const remainingMap = new Map<string, number>()
+  for (const item of order.items) {
+    const shippedQty = order.shipments
+      .flatMap((s) => s.items)
+      .filter((si) => si.orderItemId === item.id)
+      .reduce((sum, si) => sum + si.quantity, 0)
+    remainingMap.set(item.id, item.quantity - shippedQty)
+  }
+
+  const hasRemaining = Array.from(remainingMap.values()).some((v) => v > 0)
+  if (!hasRemaining) return null
+
+  const toggleItem = (itemId: string) => {
+    setSelectedItems((prev) => {
+      if (prev[itemId] !== undefined) {
+        const next = { ...prev }
+        delete next[itemId]
+        return next
+      }
+      return { ...prev, [itemId]: remainingMap.get(itemId) ?? 0 }
+    })
+  }
+
+  const selectAll = () => {
+    const all: Record<string, number> = {}
+    for (const item of order.items) {
+      const remaining = remainingMap.get(item.id) ?? 0
+      if (remaining > 0) all[item.id] = remaining
+    }
+    setSelectedItems(all)
+  }
+
+  const handleShip = () => {
+    const items = Object.entries(selectedItems)
+      .filter(([, qty]) => qty > 0)
+      .map(([orderItemId, quantity]) => ({ orderItemId, quantity }))
+    if (items.length === 0) return
+    shipOrder.mutate({
+      orderId: order.id,
+      carrier,
+      trackingNo,
+      remark: remark || undefined,
+      items,
+    })
+  }
+
+  const canSubmit = carrier.trim() && trackingNo.trim() && Object.keys(selectedItems).length > 0
+
+  return (
+    <section className="rounded-lg border bg-[var(--card)] p-4 shadow-sm">
+      <h2 className="font-semibold flex items-center gap-2 mb-4">
+        <Send className="h-4 w-4" />
+        {t('ship_order')}
+      </h2>
+
+      <div className="grid gap-3 sm:grid-cols-2 mb-4">
+        <div>
+          <label className="text-xs text-[var(--muted-foreground)] mb-1 block">{t('carrier')}</label>
+          <input
+            type="text"
+            value={carrier}
+            onChange={(e) => setCarrier(e.target.value)}
+            placeholder="e.g. 黑貓宅急便"
+            className="w-full rounded-md border bg-[var(--background)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-[var(--muted-foreground)] mb-1 block">{t('tracking_no')}</label>
+          <input
+            type="text"
+            value={trackingNo}
+            onChange={(e) => setTrackingNo(e.target.value)}
+            placeholder="e.g. TW123456789"
+            className="w-full rounded-md border bg-[var(--background)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]"
+          />
+        </div>
+      </div>
+
+      <div className="mb-3">
+        <label className="text-xs text-[var(--muted-foreground)] mb-1 block">{tc('remark')}</label>
+        <input
+          type="text"
+          value={remark}
+          onChange={(e) => setRemark(e.target.value)}
+          className="w-full rounded-md border bg-[var(--background)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]"
+        />
+      </div>
+
+      {/* 选择发货项 */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs text-[var(--muted-foreground)]">{t('select_ship_items')}</label>
+          <button
+            onClick={selectAll}
+            className="text-xs text-[#8b5cf6] hover:underline"
+          >
+            {tc('select_all')}
+          </button>
+        </div>
+        <div className="flex flex-col gap-2">
+          {order.items.map((item) => {
+            const remaining = remainingMap.get(item.id) ?? 0
+            if (remaining <= 0) return null
+            const isSelected = selectedItems[item.id] !== undefined
+            return (
+              <div
+                key={item.id}
+                className={`flex items-center gap-3 rounded-md border p-2 cursor-pointer transition-colors ${
+                  isSelected ? 'border-[#8b5cf6] bg-violet-50 dark:bg-violet-950/20' : 'hover:bg-[var(--accent)]'
+                }`}
+                onClick={() => toggleItem(item.id)}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleItem(item.id)}
+                  className="h-4 w-4 accent-[#8b5cf6]"
+                />
+                <span className="flex-1 text-sm truncate">{item.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[var(--muted-foreground)]">
+                    {t('remaining')}: {remaining}
+                  </span>
+                  {isSelected && (
+                    <input
+                      type="number"
+                      min={1}
+                      max={remaining}
+                      value={selectedItems[item.id] ?? remaining}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        const v = Math.min(Math.max(1, Number(e.target.value)), remaining)
+                        setSelectedItems((prev) => ({ ...prev, [item.id]: v }))
+                      }}
+                      className="w-16 rounded border bg-[var(--background)] px-2 py-1 text-sm text-center outline-none focus:ring-1 focus:ring-[var(--ring)]"
+                    />
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <button
+        onClick={handleShip}
+        disabled={!canSubmit || shipOrder.isPending}
+        className="flex items-center gap-2 rounded-md bg-[#8b5cf6] px-4 py-2 text-sm font-medium text-white hover:bg-[#7c3aed] disabled:opacity-50"
+      >
+        <Truck className="h-4 w-4" />
+        {t('ship_order')}
+      </button>
+    </section>
+  )
+}
+
 function ShipmentCard({ shipment }: { shipment: ShipmentVO }) {
   const t = useTranslations('ordering')
-  const confirmReceive = useConfirmReceive()
 
   const statusColors: Record<string, string> = {
     shipped: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
@@ -233,23 +397,11 @@ function ShipmentCard({ shipment }: { shipment: ShipmentVO }) {
 
   return (
     <div className="rounded-lg border bg-[var(--card)] p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-mono font-semibold">{shipment.shipmentNo}</span>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[shipment.status] ?? 'bg-gray-100 text-gray-600'}`}>
-            {t(`shipment_status_${shipment.status}`)}
-          </span>
-        </div>
-        {shipment.status === 'shipped' && (
-          <button
-            onClick={() => confirmReceive.mutate(shipment.id)}
-            disabled={confirmReceive.isPending}
-            className="flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            {t('confirm_receive')}
-          </button>
-        )}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-sm font-mono font-semibold">{shipment.shipmentNo}</span>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[shipment.status] ?? 'bg-gray-100 text-gray-600'}`}>
+          {t(`shipment_status_${shipment.status}`)}
+        </span>
       </div>
       <div className="grid gap-2 text-sm sm:grid-cols-2 mb-3">
         {shipment.carrier && (
@@ -277,10 +429,8 @@ function ShipmentCard({ shipment }: { shipment: ShipmentVO }) {
           </div>
         )}
       </div>
-      {/* 发货项 */}
       {shipment.items.length > 0 && (
         <div className="border-t pt-2">
-          <p className="text-xs text-[var(--muted-foreground)] mb-1.5">{t('shipment_items')}:</p>
           <div className="flex flex-col gap-1">
             {shipment.items.map((si) => (
               <div key={si.id} className="flex items-center gap-2 text-sm">
@@ -294,7 +444,7 @@ function ShipmentCard({ shipment }: { shipment: ShipmentVO }) {
                   )}
                 </div>
                 <span className="flex-1 truncate">{si.name}</span>
-                <span className="text-[var(--muted-foreground)]">× {si.quantity}</span>
+                <span className="text-[var(--muted-foreground)]">x {si.quantity}</span>
               </div>
             ))}
           </div>
@@ -304,20 +454,32 @@ function ShipmentCard({ shipment }: { shipment: ShipmentVO }) {
   )
 }
 
-/** 操作按钮区 */
-function OrderActions({ order }: { order: OrderVO }) {
+function PlatformActions({ order }: { order: OrderVO }) {
   const t = useTranslations('ordering')
   const tc = useTranslations('common')
+  const confirmOrder = useConfirmOrder()
   const cancelOrder = useCancelOrder()
   const [showCancel, setShowCancel] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
 
-  const canCancel = order.status === 'pending'
+  const canConfirm = order.status === 'pending'
+  const canCancel = ['pending', 'confirmed'].includes(order.status)
 
-  if (!canCancel) return null
+  if (!canConfirm && !canCancel) return null
 
   return (
     <div className="flex flex-wrap gap-3">
+      {canConfirm && (
+        <button
+          onClick={() => confirmOrder.mutate(order.id)}
+          disabled={confirmOrder.isPending}
+          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          {t('confirm_order')}
+        </button>
+      )}
+
       {canCancel && !showCancel && (
         <button
           onClick={() => setShowCancel(true)}

@@ -36,7 +36,8 @@
     "logout": "Logout",
     "save_success": "Saved successfully",
     "language_preference": "Language Preference",
-    "language_updated": "Language updated"
+    "language_updated": "Language updated",
+    "select_all": "Select All"
   },
   "auth": {
     "login": "Login",
