@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://crmall0125:xx123654@192.168.110.246:5433/crmall0125?schema=public
+      AUTH_SECRET: a3baacf58e04bc5217920341700bcf4cc87a700dff7635ee9420cf57b3dd64cf
+      NODE_ENV: production

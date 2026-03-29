@@ -70,7 +70,8 @@ model User {
   tenant       Tenant      @relation(fields: [tenantId], references: [id])
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
-  email        String      @unique
+  username     String      @unique
+  email        String?     @unique
   phone        String?
   name         String
   avatar       String?

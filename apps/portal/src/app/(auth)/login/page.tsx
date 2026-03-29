@@ -40,12 +40,12 @@ export default function LoginPage() {
           )}
 
           <FormInput
-            id="email"
-            name="email"
-            type="email"
-            label={t('email')}
-            placeholder="admin@twcrm.com"
-            autoComplete="email"
+            id="username"
+            name="username"
+            type="text"
+            label={t('username')}
+            placeholder="admin"
+            autoComplete="username"
             required
           />
 

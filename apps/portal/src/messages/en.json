@@ -42,12 +42,13 @@
   "auth": {
     "login": "Login",
     "logout": "Logout",
+    "username": "Username",
     "email": "Email",
     "password": "Password",
     "remember_me": "Remember me",
     "forgot_password": "Forgot password",
     "login_success": "Login successful",
-    "login_failed": "Login failed, please check your email and password",
+    "login_failed": "Login failed, please check your username and password",
     "unauthorized": "Not logged in, please login first",
     "forbidden": "No permission to perform this action",
     "register": "Register",
@@ -58,6 +59,7 @@
     "password_mismatch": "Passwords do not match",
     "language": "Language",
     "email_exists": "This email is already registered",
+    "username_exists": "This username is already taken",
     "have_account": "Already have an account?",
     "no_account": "Don't have an account?"
   },

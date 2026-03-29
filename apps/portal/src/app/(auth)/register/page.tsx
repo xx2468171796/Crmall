@@ -38,7 +38,7 @@ export default function RegisterPage() {
               {state.error === 'auth.password_mismatch'
                 ? t('password_mismatch')
                 : state.error === 'auth.email_exists'
-                  ? t('email_exists')
+                  ? t('username_exists')
                   : t('register_failed')}
             </div>
           )}
@@ -49,16 +49,9 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <FormInput id="name" name="name" type="text" label={t('name')} required />
+          <FormInput id="username" name="username" type="text" label={t('username')} autoComplete="username" required />
 
-          <FormInput
-            id="email"
-            name="email"
-            type="email"
-            label={t('email')}
-            autoComplete="email"
-            required
-          />
+          <FormInput id="name" name="name" type="text" label={t('name')} required />
 
           <FormInput
             id="password"

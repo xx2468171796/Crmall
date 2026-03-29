@@ -16,11 +16,11 @@ export async function loginAction(
   formData: FormData
 ): Promise<ActionResult<null>> {
   try {
-    const email = formData.get('email') as string
+    const username = formData.get('username') as string
 
     // 先查询用户 locale，登录后设置 cookie
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { username },
       select: { locale: true },
     })
     if (user?.locale) {
@@ -33,7 +33,7 @@ export async function loginAction(
     }
 
     await signIn('credentials', {
-      email,
+      username,
       password: formData.get('password') as string,
       redirectTo: (formData.get('callbackUrl') as string) || '/dashboard',
     })
@@ -59,13 +59,13 @@ export async function registerAction(
   formData: FormData
 ): Promise<ActionResult<null>> {
   try {
-    const email = formData.get('email') as string
+    const username = formData.get('username') as string
     const name = formData.get('name') as string
     const password = formData.get('password') as string
     const confirmPassword = formData.get('confirmPassword') as string
     const locale = (formData.get('locale') as Locale) || 'zh-TW'
 
-    if (!email || !name || !password) {
+    if (!username || !name || !password) {
       return { success: false, error: 'auth.register_failed' }
     }
 
@@ -77,8 +77,8 @@ export async function registerAction(
       return { success: false, error: 'auth.register_failed' }
     }
 
-    // 检查 email 是否已存在
-    const existing = await prisma.user.findUnique({ where: { email } })
+    // 检查 username 是否已存在
+    const existing = await prisma.user.findUnique({ where: { username } })
     if (existing) {
       return { success: false, error: 'auth.email_exists' }
     }
@@ -101,7 +101,7 @@ export async function registerAction(
     await prisma.user.create({
       data: {
         tenantId: hqTenant.id,
-        email,
+        username,
         name,
         passwordHash,
         locale,

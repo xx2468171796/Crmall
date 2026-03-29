@@ -96,10 +96,11 @@ async function main() {
   const passwordHash = process.env.SEED_PASSWORD_HASH
     ?? '$2b$10$.PwLX5.FFSESHa6P60fXGen82v/7Gbo8eYGdG7JhgvLKpe5pLsAva'
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@twcrm.com' },
+    where: { username: 'admin' },
     update: { passwordHash },
     create: {
       tenantId: hq.id,
+      username: 'admin',
       email: 'admin@twcrm.com',
       name: '系统管理员',
       passwordHash,
@@ -120,18 +121,18 @@ async function main() {
       roleId: platformAdminRole.id,
     },
   })
-  console.log(`✅ 创建超级管理员: ${admin.email}`)
+  console.log(`✅ 创建超级管理员: ${admin.username}`)
 
   // 4.1 创建子公司测试用户
   const tenantAdminRole = roles[2]
   const tenantUserRole = roles[4]
 
   const tpeAdmin = await prisma.user.upsert({
-    where: { email: 'tpe_admin' },
+    where: { username: 'tpe_admin' },
     update: { passwordHash },
     create: {
       tenantId: subsidiaries[0].id,
-      email: 'tpe_admin',
+      username: 'tpe_admin',
       name: '台北管理员',
       passwordHash,
       locale: 'zh-TW',
@@ -145,11 +146,11 @@ async function main() {
   })
 
   const tpeUser = await prisma.user.upsert({
-    where: { email: 'tpe_user' },
+    where: { username: 'tpe_user' },
     update: { passwordHash },
     create: {
       tenantId: subsidiaries[0].id,
-      email: 'tpe_user',
+      username: 'tpe_user',
       name: '台北员工',
       passwordHash,
       locale: 'zh-TW',
