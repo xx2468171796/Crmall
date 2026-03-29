@@ -5,6 +5,7 @@
 import type { PrismaClient } from '@twcrm/db'
 
 type TransactionClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>
+import { clampPagination } from '@twcrm/shared'
 import type { PaginatedResult } from '@twcrm/shared'
 import type { IRbacRepository } from './rbac.repository.interface'
 import type {
@@ -96,8 +97,7 @@ export class RbacRepository implements IRbacRepository {
   constructor(private readonly db: PrismaClient) {}
 
   async getRoles(filters: RoleFilters): Promise<PaginatedResult<RoleVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = {}
     if (filters.search) {
       where.OR = [
@@ -260,8 +260,7 @@ export class RbacRepository implements IRbacRepository {
   }
 
   async getUsersWithRoles(filters: UserFilters): Promise<PaginatedResult<UserRoleVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = {}
     if (filters.search) {
       where.OR = [

@@ -7,7 +7,7 @@ import type {
   WarehouseVO, CreateWarehouseDTO, UpdateWarehouseDTO,
   StockVO, StockFilters, StockAdjustDTO,
   SnCodeVO, CreateSnCodeDTO, UpdateSnCodeDTO, SnFilters,
-  SupplierVO, CreateSupplierDTO, UpdateSupplierDTO,
+  SupplierVO, CreateSupplierDTO, UpdateSupplierDTO, SupplierFilters,
   PurchaseOrderVO, CreatePurchaseOrderDTO, PurchaseOrderFilters, ReceivePurchaseItemDTO,
   TransferOrderVO, CreateTransferOrderDTO, TransferOrderFilters, ReceiveTransferItemDTO,
   StockMovementVO, StockMovementFilters,
@@ -38,7 +38,7 @@ export interface ISnCodeService {
 }
 
 export interface ISupplierService {
-  getSuppliers(tenantId: string | null, filters: { search?: string; status?: string; page?: number; perPage?: number }): Promise<PaginatedResult<SupplierVO>>
+  getSuppliers(tenantId: string | null, filters: SupplierFilters): Promise<PaginatedResult<SupplierVO>>
   getSupplierById(id: string): Promise<SupplierVO | null>
   createSupplier(tenantId: string | null, dto: CreateSupplierDTO): Promise<SupplierVO>
   updateSupplier(id: string, dto: UpdateSupplierDTO): Promise<SupplierVO>

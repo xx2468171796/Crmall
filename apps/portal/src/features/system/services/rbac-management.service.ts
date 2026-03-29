@@ -3,7 +3,7 @@
 // ============================================
 
 import type { IConfigService, PaginatedResult } from '@twcrm/shared'
-import { NotFoundError, DuplicateError, BusinessRuleError } from '@twcrm/shared'
+import { NotFoundError, DuplicateError, BusinessRuleError, ForbiddenError } from '@twcrm/shared'
 import type { IRbacManagementService } from './rbac-management.service.interface'
 import type { IRbacRepository } from '../repositories/rbac.repository.interface'
 import type {
@@ -66,7 +66,27 @@ export class RbacManagementService implements IRbacManagementService {
     return this.rbacRepo.getUsersWithRoles(filters)
   }
 
-  async assignUserRoles(dto: AssignUserRolesDTO): Promise<void> {
+  async assignUserRoles(dto: AssignUserRolesDTO, assignerRoles: string[]): Promise<void> {
+    // Determine the assigner's minimum role level (lower level = higher privilege)
+    const assignerLevels = await Promise.all(
+      assignerRoles.map(async (name) => {
+        const role = await this.rbacRepo.getRoleByName(name)
+        return role?.level ?? 999
+      })
+    )
+    const assignerMinLevel = assignerLevels.length > 0 ? Math.min(...assignerLevels) : 999
+
+    // Platform admin (level 0) can assign anything; skip checks
+    if (assignerMinLevel > 0) {
+      for (const roleId of dto.roleIds) {
+        const role = await this.rbacRepo.getRoleById(roleId)
+        if (!role) throw new NotFoundError('角色', roleId)
+        if (role.level <= assignerMinLevel) {
+          throw new ForbiddenError('Cannot assign roles at or above your own privilege level')
+        }
+      }
+    }
+
     await this.rbacRepo.assignUserRoles(dto)
   }
 

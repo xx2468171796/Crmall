@@ -25,7 +25,7 @@ import type {
   WarehouseVO, CreateWarehouseDTO, UpdateWarehouseDTO,
   StockVO, StockFilters, StockAdjustDTO,
   SnCodeVO, CreateSnCodeDTO, UpdateSnCodeDTO, SnFilters,
-  SupplierVO, CreateSupplierDTO, UpdateSupplierDTO,
+  SupplierVO, CreateSupplierDTO, UpdateSupplierDTO, SupplierFilters,
   PurchaseOrderVO, CreatePurchaseOrderDTO, PurchaseOrderFilters, ReceivePurchaseItemDTO,
   TransferOrderVO, CreateTransferOrderDTO, TransferOrderFilters, ReceiveTransferItemDTO,
   StockMovementVO, StockMovementFilters,
@@ -197,7 +197,7 @@ export class SupplierService implements ISupplierService {
     protected readonly configService: IConfigService,
   ) {}
 
-  async getSuppliers(tenantId: string | null, filters: { search?: string; status?: string; page?: number; perPage?: number }): Promise<PaginatedResult<SupplierVO>> {
+  async getSuppliers(tenantId: string | null, filters: SupplierFilters): Promise<PaginatedResult<SupplierVO>> {
     return this.supplierRepo.findAll(tenantId, filters)
   }
 

@@ -1,11 +1,13 @@
 'use server'
 
 import { signIn, signOut } from '@/lib/auth'
+import { requireAuth } from '@/lib/container'
+import { checkRateLimit } from '@/lib/rate-limit'
 import { AuthError } from 'next-auth'
 import { hash } from 'bcryptjs'
 import { cookies } from 'next/headers'
 import { prisma } from '@twcrm/db'
-import { LOCALES, type Locale } from '@twcrm/shared'
+import { AppError, LOCALES, type Locale } from '@twcrm/shared'
 import type { ActionResult } from '@twcrm/shared'
 
 /**
@@ -17,6 +19,7 @@ export async function loginAction(
 ): Promise<ActionResult<null>> {
   try {
     const username = formData.get('username') as string
+    checkRateLimit(`login:${username}`, 60_000, 5)  // 5 attempts per username per minute
 
     // 先查询用户 locale，登录后设置 cookie
     const user = await prisma.user.findUnique({
@@ -39,6 +42,9 @@ export async function loginAction(
     })
     return { success: true, data: null }
   } catch (error) {
+    if (error instanceof AppError && error.code === 'RATE_LIMITED') {
+      return { success: false, error: 'auth.rate_limited' }
+    }
     if (error instanceof AuthError) {
       switch (error.type) {
         case 'CredentialsSignin':
@@ -65,8 +71,14 @@ export async function registerAction(
     const confirmPassword = formData.get('confirmPassword') as string
     const locale = (formData.get('locale') as Locale) || 'zh-TW'
 
+    checkRateLimit(`register:${username}`, 300_000, 3)  // 3 registrations per username per 5 minutes
+
     if (!username || !name || !password) {
       return { success: false, error: 'auth.register_failed' }
+    }
+
+    if (password.length < 8) {
+      return { success: false, error: 'auth.password_too_short' }
     }
 
     if (password !== confirmPassword) {
@@ -113,7 +125,10 @@ export async function registerAction(
     })
 
     return { success: true, data: null }
-  } catch {
+  } catch (error) {
+    if (error instanceof AppError && error.code === 'RATE_LIMITED') {
+      return { success: false, error: 'auth.rate_limited' }
+    }
     return { success: false, error: 'auth.register_failed' }
   }
 }
@@ -126,15 +141,15 @@ export async function updateLocaleAction(
   formData: FormData
 ): Promise<ActionResult<null>> {
   try {
-    const userId = formData.get('userId') as string
+    const user = await requireAuth()
     const locale = formData.get('locale') as Locale
 
-    if (!userId || !locale || !LOCALES.includes(locale)) {
+    if (!locale || !LOCALES.includes(locale)) {
       return { success: false, error: 'common.operation_failed' }
     }
 
     await prisma.user.update({
-      where: { id: userId },
+      where: { id: user.id },
       data: { locale },
     })
 

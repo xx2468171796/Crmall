@@ -45,6 +45,8 @@ export interface PaymentFilters {
   dateTo?: string
   page?: number
   perPage?: number
+  createdBy?: string
+  departmentId?: string
 }
 
 // ---- 付款 (Disbursement) ----
@@ -85,6 +87,8 @@ export interface DisbursementFilters {
   dateTo?: string
   page?: number
   perPage?: number
+  createdBy?: string
+  departmentId?: string
 }
 
 // ---- 发票 (Invoice) ----
@@ -134,6 +138,8 @@ export interface InvoiceFilters {
   dateTo?: string
   page?: number
   perPage?: number
+  createdBy?: string
+  departmentId?: string
 }
 
 // ---- 费用报销 (Expense) ----
@@ -171,4 +177,6 @@ export interface ExpenseFilters {
   dateTo?: string
   page?: number
   perPage?: number
+  createdBy?: string
+  departmentId?: string
 }

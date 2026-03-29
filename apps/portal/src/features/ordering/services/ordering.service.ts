@@ -6,10 +6,17 @@
 import type { IConfigService, PaginatedResult } from '@twcrm/shared'
 import {
   BusinessRuleError,
+  generateDocumentNo,
   InsufficientBalanceError,
   InsufficientStockError,
   NotFoundError,
 } from '@twcrm/shared'
+import type { PrismaClient } from '@twcrm/db'
+import {
+  OrderRepository,
+  CartRepository,
+  AccountRepository,
+} from '../repositories/ordering.repository'
 import type {
   ICatalogRepository, ICartRepository, IOrderRepository, IShipmentRepository, IAccountRepository,
 } from '../repositories/ordering.repository.interface'
@@ -125,43 +132,53 @@ export class OrderService implements IOrderService {
     }
 
     // 生成订单号
-    const orderNo = `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+    const orderNo = generateDocumentNo('ORD')
 
-    // 创建订单
+    // 在事务中执行: 创建订单 + 扣款 + 清空购物车，保证原子性
+    // 延迟导入 prisma 避免在测试环境中触发 DATABASE_URL 校验
+    const { prisma } = await import('@twcrm/db')
     const status = autoConfirm ? 'confirmed' : 'pending'
-    const order = await this.orderRepo.create({
-      orderNo,
-      tenantId,
-      totalAmount,
-      currency: defaultCurrency,
-      status,
-      paymentMethod,
-      remark: dto.remark,
-      createdBy: userId,
-      items: cartItems.map((item) => ({
-        productId: item.productId,
-        variantId: item.variantId ?? undefined,
-        sku: item.variantSku ?? item.productSku,
-        name: item.productName,
-        variantName: item.variantName ?? undefined,
-        image: item.productImage ?? undefined,
-        specs: item.specs ?? undefined,
-        price: item.price,
-        quantity: item.quantity,
-        subtotal: item.subtotal,
-        remark: item.remark ?? undefined,
-      })),
+    return prisma.$transaction(async (tx) => {
+      const txClient = tx as unknown as PrismaClient
+      const txOrderRepo = new OrderRepository(txClient)
+      const txAccountRepo = new AccountRepository(txClient)
+      const txCartRepo = new CartRepository(txClient)
+
+      // 1. 创建订单
+      const order = await txOrderRepo.create({
+        orderNo,
+        tenantId,
+        totalAmount,
+        currency: defaultCurrency,
+        status,
+        paymentMethod,
+        remark: dto.remark,
+        createdBy: userId,
+        items: cartItems.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId ?? undefined,
+          sku: item.variantSku ?? item.productSku,
+          name: item.productName,
+          variantName: item.variantName ?? undefined,
+          image: item.productImage ?? undefined,
+          specs: item.specs ?? undefined,
+          price: item.price,
+          quantity: item.quantity,
+          subtotal: item.subtotal,
+          remark: item.remark ?? undefined,
+        })),
+      })
+
+      // 2. 余额扣款
+      if (paymentMethod === 'balance') {
+        await txAccountRepo.deduct(tenantId, totalAmount, order.id, userId)
+      }
+
+      // 3. 清空购物车
+      await txCartRepo.clearCart(tenantId, userId)
+
+      return order
     })
-
-    // 余额扣款
-    if (paymentMethod === 'balance') {
-      await this.accountRepo.deduct(tenantId, totalAmount, order.id, userId)
-    }
-
-    // 清空购物车
-    await this.cartRepo.clearCart(tenantId, userId)
-
-    return order
   }
 
   async getOrders(tenantId: string, filters: OrderFilters): Promise<PaginatedResult<OrderVO>> {
@@ -223,7 +240,7 @@ export class OrderService implements IOrderService {
     }
 
     // 生成物流批次号
-    const shipmentNo = `SHP-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+    const shipmentNo = generateDocumentNo('SHP')
 
     const shipment = await this.shipmentRepo.create({
       shipmentNo,
@@ -250,7 +267,7 @@ export class OrderService implements IOrderService {
       await this.orderRepo.updateStatus(id, 'shipped')
     } else if (order.status === 'confirmed') {
       // 部分发货，标记为 shipping（处理中）
-      await this.orderRepo.updateStatus(id, 'shipped')
+      await this.orderRepo.updateStatus(id, 'shipping')
     }
 
     return shipment

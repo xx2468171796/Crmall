@@ -4,7 +4,7 @@
 // ============================================
 
 import type { IConfigService, PaginatedResult } from '@twcrm/shared'
-import { BusinessRuleError, NotFoundError } from '@twcrm/shared'
+import { BusinessRuleError, generateDocumentNo, NotFoundError } from '@twcrm/shared'
 import type {
   IPaymentRepository, IDisbursementRepository,
   IInvoiceRepository, IExpenseRepository,
@@ -20,15 +20,6 @@ import type {
   ExpenseVO, ExpenseFilters, CreateExpenseDTO,
 } from '../types/finance.types'
 
-/** 生成带日期前缀的编号: PREFIX-yyyyMMdd-XXXX */
-function generateNo(prefix: string): string {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  const d = String(now.getDate()).padStart(2, '0')
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
-  return `${prefix}-${y}${m}${d}-${rand}`
-}
 
 // ---- 收款 (Payment) ----
 
@@ -42,7 +33,7 @@ export class PaymentService implements IPaymentService {
     // 从 ConfigService 读取默认币别
     const defaultCurrency = await this.configService.get('finance', 'default_currency', tenantId) ?? 'TWD'
 
-    const paymentNo = generateNo('PAY')
+    const paymentNo = generateDocumentNo('PAY')
     return this.paymentRepo.create(tenantId, {
       ...dto,
       currency: dto.currency ?? defaultCurrency,
@@ -82,7 +73,7 @@ export class DisbursementService implements IDisbursementService {
   async create(tenantId: string, userId: string, dto: CreateDisbursementDTO): Promise<DisbursementVO> {
     const defaultCurrency = await this.configService.get('finance', 'default_currency', tenantId) ?? 'TWD'
 
-    const disbNo = generateNo('DIS')
+    const disbNo = generateDocumentNo('DIS')
     return this.disbRepo.create(tenantId, {
       ...dto,
       currency: dto.currency ?? defaultCurrency,
@@ -128,7 +119,7 @@ export class InvoiceService implements IInvoiceService {
     const taxAmount = Math.round(dto.amount * taxRate * 100) / 100
     const totalAmount = Math.round((dto.amount + taxAmount) * 100) / 100
 
-    const invoiceNo = generateNo('INV')
+    const invoiceNo = generateDocumentNo('INV')
     return this.invoiceRepo.create(tenantId, {
       invoiceNo,
       type: dto.type,
@@ -180,7 +171,7 @@ export class ExpenseService implements IExpenseService {
   async create(tenantId: string, userId: string, dto: CreateExpenseDTO): Promise<ExpenseVO> {
     const defaultCurrency = await this.configService.get('finance', 'default_currency', tenantId) ?? 'TWD'
 
-    const expenseNo = generateNo('EXP')
+    const expenseNo = generateDocumentNo('EXP')
     return this.expenseRepo.create(tenantId, {
       ...dto,
       currency: dto.currency ?? defaultCurrency,

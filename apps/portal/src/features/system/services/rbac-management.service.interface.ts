@@ -21,6 +21,6 @@ export interface IRbacManagementService {
 
   // User-Role
   getUsersWithRoles(filters: UserFilters): Promise<PaginatedResult<UserRoleVO>>
-  assignUserRoles(dto: AssignUserRolesDTO): Promise<void>
+  assignUserRoles(dto: AssignUserRolesDTO, assignerRoles: string[]): Promise<void>
   removeUserRole(userId: string, roleId: string): Promise<void>
 }

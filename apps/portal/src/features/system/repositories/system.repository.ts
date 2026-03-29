@@ -3,6 +3,7 @@
 // ============================================
 
 import type { PrismaClient } from '@twcrm/db'
+import { clampPagination } from '@twcrm/shared'
 import type { PaginatedResult } from '@twcrm/shared'
 import type { IAnnouncementRepository, INotificationRepository, IConfigRepository } from './system.repository.interface'
 import type {
@@ -70,8 +71,7 @@ export class AnnouncementRepository implements IAnnouncementRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findPublished(userId: string, filters: AnnouncementFilters): Promise<PaginatedResult<AnnouncementVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const now = new Date()
     const where: Record<string, unknown> = {
       status: 'published',
@@ -99,8 +99,7 @@ export class AnnouncementRepository implements IAnnouncementRepository {
   }
 
   async findAll(filters: AnnouncementFilters): Promise<PaginatedResult<AnnouncementVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = {}
     if (filters.status) where.status = filters.status
     if (filters.type) where.type = filters.type
@@ -176,8 +175,7 @@ export class NotificationRepository implements INotificationRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findByUser(userId: string, filters: NotificationFilters): Promise<PaginatedResult<NotificationVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = { userId }
     if (filters.isRead !== undefined) where.isRead = filters.isRead
     if (filters.type) where.type = filters.type

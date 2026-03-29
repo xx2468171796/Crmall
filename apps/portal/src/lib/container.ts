@@ -3,11 +3,21 @@
 // 所有 Service 通过此文件创建，禁止直接 new
 // ============================================
 
-import { prisma } from '@twcrm/db'
+import { prisma, withTenant } from '@twcrm/db'
+import type { PrismaClient } from '@twcrm/db'
 import { ConfigService } from './services/config.service'
 import { RbacService } from './services/rbac.service'
 import type { IConfigService, SessionUser } from '@twcrm/shared'
 import type { IRbacService } from './services/rbac.service'
+
+/**
+ * 创建租户隔离的 Prisma Client
+ * 平台用户（isPlatform=true）直接使用原始 prisma，不注入 tenantId 过滤
+ */
+function getTenantPrisma(tenantId: string, isPlatform: boolean): PrismaClient {
+  if (isPlatform) return prisma
+  return withTenant(prisma, tenantId) as unknown as PrismaClient
+}
 
 // ---- 单例 ----
 
@@ -65,27 +75,31 @@ import { CatalogRepository, CartRepository, OrderRepository, ShipmentRepository,
 import { CatalogService, CartService, OrderService, AccountService } from '@/features/ordering/services/ordering.service'
 import type { ICatalogService, ICartService, IOrderService, IAccountService } from '@/features/ordering/services/ordering.service.interface'
 
-export function createCatalogService(): ICatalogService {
-  return new CatalogService(new CatalogRepository(prisma), getConfigService())
+export function createCatalogService(tenantId: string, isPlatform: boolean): ICatalogService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new CatalogService(new CatalogRepository(db), getConfigService())
 }
 
-export function createCartService(): ICartService {
-  return new CartService(new CartRepository(prisma), new CatalogRepository(prisma), getConfigService())
+export function createCartService(tenantId: string, isPlatform: boolean): ICartService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new CartService(new CartRepository(db), new CatalogRepository(db), getConfigService())
 }
 
-export function createOrderService(): IOrderService {
+export function createOrderService(tenantId: string, isPlatform: boolean): IOrderService {
+  const db = getTenantPrisma(tenantId, isPlatform)
   return new OrderService(
-    new OrderRepository(prisma),
-    new CartRepository(prisma),
-    new CatalogRepository(prisma),
-    new AccountRepository(prisma),
-    new ShipmentRepository(prisma),
+    new OrderRepository(db),
+    new CartRepository(db),
+    new CatalogRepository(db),
+    new AccountRepository(db),
+    new ShipmentRepository(db),
     getConfigService(),
   )
 }
 
-export function createAccountService(): IAccountService {
-  return new AccountService(new AccountRepository(prisma), getConfigService())
+export function createAccountService(tenantId: string, isPlatform: boolean): IAccountService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new AccountService(new AccountRepository(db), getConfigService())
 }
 
 // TODO: CRM 模块
@@ -93,16 +107,19 @@ import { CustomerRepository, OpportunityRepository, FollowUpRepository } from '@
 import { CustomerService, OpportunityService, FollowUpService } from '@/features/crm/services/crm.service'
 import type { ICustomerService, IOpportunityService, IFollowUpService } from '@/features/crm/services/crm.service.interface'
 
-export function createCustomerService(): ICustomerService {
-  return new CustomerService(new CustomerRepository(prisma), getConfigService())
+export function createCustomerService(tenantId: string, isPlatform: boolean): ICustomerService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new CustomerService(new CustomerRepository(db), getConfigService())
 }
 
-export function createOpportunityService(): IOpportunityService {
-  return new OpportunityService(new OpportunityRepository(prisma), getConfigService())
+export function createOpportunityService(tenantId: string, isPlatform: boolean): IOpportunityService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new OpportunityService(new OpportunityRepository(db), getConfigService())
 }
 
-export function createFollowUpService(): IFollowUpService {
-  return new FollowUpService(new FollowUpRepository(prisma), getConfigService())
+export function createFollowUpService(tenantId: string, isPlatform: boolean): IFollowUpService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new FollowUpService(new FollowUpRepository(db), getConfigService())
 }
 
 // TODO: 通知模块
@@ -110,16 +127,19 @@ import { AnnouncementRepository, NotificationRepository, ConfigRepository } from
 import { AnnouncementService, NotificationService, SystemConfigService } from '@/features/system/services/system.service'
 import type { IAnnouncementService, INotificationService, ISystemConfigService } from '@/features/system/services/system.service.interface'
 
-export function createAnnouncementService(): IAnnouncementService {
-  return new AnnouncementService(new AnnouncementRepository(prisma), getConfigService())
+export function createAnnouncementService(tenantId: string, isPlatform: boolean): IAnnouncementService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new AnnouncementService(new AnnouncementRepository(db), getConfigService())
 }
 
-export function createNotificationService(): INotificationService {
-  return new NotificationService(new NotificationRepository(prisma), getConfigService())
+export function createNotificationService(tenantId: string, isPlatform: boolean): INotificationService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new NotificationService(new NotificationRepository(db), getConfigService())
 }
 
-export function createSystemConfigService(): ISystemConfigService {
-  return new SystemConfigService(new ConfigRepository(prisma), getConfigService())
+export function createSystemConfigService(tenantId: string, isPlatform: boolean): ISystemConfigService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new SystemConfigService(new ConfigRepository(db), getConfigService())
 }
 
 // RBAC 管理
@@ -127,8 +147,9 @@ import { RbacRepository } from '@/features/system/repositories/rbac.repository'
 import { RbacManagementService } from '@/features/system/services/rbac-management.service'
 import type { IRbacManagementService } from '@/features/system/services/rbac-management.service.interface'
 
-export function createRbacManagementService(): IRbacManagementService {
-  return new RbacManagementService(new RbacRepository(prisma), getConfigService())
+export function createRbacManagementService(tenantId: string, isPlatform: boolean): IRbacManagementService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new RbacManagementService(new RbacRepository(db), getConfigService())
 }
 
 // Finance 财务
@@ -136,20 +157,24 @@ import { PaymentRepository, DisbursementRepository, InvoiceRepository, ExpenseRe
 import { PaymentService, DisbursementService, InvoiceService, ExpenseService } from '@/features/finance/services/finance.service'
 import type { IPaymentService, IDisbursementService, IInvoiceService, IExpenseService } from '@/features/finance/services/finance.service.interface'
 
-export function createPaymentService(): IPaymentService {
-  return new PaymentService(new PaymentRepository(prisma), getConfigService())
+export function createPaymentService(tenantId: string, isPlatform: boolean): IPaymentService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new PaymentService(new PaymentRepository(db), getConfigService())
 }
 
-export function createDisbursementService(): IDisbursementService {
-  return new DisbursementService(new DisbursementRepository(prisma), getConfigService())
+export function createDisbursementService(tenantId: string, isPlatform: boolean): IDisbursementService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new DisbursementService(new DisbursementRepository(db), getConfigService())
 }
 
-export function createInvoiceService(): IInvoiceService {
-  return new InvoiceService(new InvoiceRepository(prisma), getConfigService())
+export function createInvoiceService(tenantId: string, isPlatform: boolean): IInvoiceService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new InvoiceService(new InvoiceRepository(db), getConfigService())
 }
 
-export function createExpenseService(): IExpenseService {
-  return new ExpenseService(new ExpenseRepository(prisma), getConfigService())
+export function createExpenseService(tenantId: string, isPlatform: boolean): IExpenseService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new ExpenseService(new ExpenseRepository(db), getConfigService())
 }
 
 // Inventory 进销存
@@ -169,40 +194,47 @@ import type {
   IStockMovementService,
 } from '@/features/inventory/services/inventory.service.interface'
 
-export function createWarehouseService(): IWarehouseService {
-  return new WarehouseService(new WarehouseRepository(prisma), getConfigService())
+export function createWarehouseService(tenantId: string, isPlatform: boolean): IWarehouseService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new WarehouseService(new WarehouseRepository(db), getConfigService())
 }
 
-export function createStockService(): IStockService {
-  return new StockService(new StockRepository(prisma), new StockMovementRepository(prisma), getConfigService())
+export function createStockService(tenantId: string, isPlatform: boolean): IStockService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new StockService(new StockRepository(db), new StockMovementRepository(db), getConfigService())
 }
 
-export function createSnCodeService(): ISnCodeService {
-  return new SnCodeService(new SnCodeRepository(prisma), getConfigService())
+export function createSnCodeService(tenantId: string, isPlatform: boolean): ISnCodeService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new SnCodeService(new SnCodeRepository(db), getConfigService())
 }
 
-export function createSupplierService(): ISupplierService {
-  return new SupplierService(new SupplierRepository(prisma), getConfigService())
+export function createSupplierService(tenantId: string, isPlatform: boolean): ISupplierService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new SupplierService(new SupplierRepository(db), getConfigService())
 }
 
-export function createPurchaseOrderService(): IPurchaseOrderService {
+export function createPurchaseOrderService(tenantId: string, isPlatform: boolean): IPurchaseOrderService {
+  const db = getTenantPrisma(tenantId, isPlatform)
   return new PurchaseOrderService(
-    new PurchaseOrderRepository(prisma),
-    new StockRepository(prisma),
-    new StockMovementRepository(prisma),
+    new PurchaseOrderRepository(db),
+    new StockRepository(db),
+    new StockMovementRepository(db),
     getConfigService(),
   )
 }
 
-export function createTransferOrderService(): ITransferOrderService {
+export function createTransferOrderService(tenantId: string, isPlatform: boolean): ITransferOrderService {
+  const db = getTenantPrisma(tenantId, isPlatform)
   return new TransferOrderService(
-    new TransferOrderRepository(prisma),
-    new StockRepository(prisma),
-    new StockMovementRepository(prisma),
+    new TransferOrderRepository(db),
+    new StockRepository(db),
+    new StockMovementRepository(db),
     getConfigService(),
   )
 }
 
-export function createStockMovementService(): IStockMovementService {
-  return new StockMovementService(new StockMovementRepository(prisma), getConfigService())
+export function createStockMovementService(tenantId: string, isPlatform: boolean): IStockMovementService {
+  const db = getTenantPrisma(tenantId, isPlatform)
+  return new StockMovementService(new StockMovementRepository(db), getConfigService())
 }

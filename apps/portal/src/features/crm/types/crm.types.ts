@@ -51,6 +51,8 @@ export interface CustomerFilters {
   level?: string
   source?: string
   ownerId?: string
+  createdBy?: string
+  departmentId?: string
   page?: number
   perPage?: number
 }
@@ -98,6 +100,8 @@ export interface OpportunityFilters {
   stage?: string
   ownerId?: string
   customerId?: string
+  createdBy?: string
+  departmentId?: string
   page?: number
   perPage?: number
 }

@@ -3,6 +3,7 @@
 // ============================================
 
 import type { PrismaClient } from '@twcrm/db'
+import { clampPagination, generateDocumentNo } from '@twcrm/shared'
 import type { PaginatedResult } from '@twcrm/shared'
 import type {
   IWarehouseRepository, IStockRepository, ISnCodeRepository,
@@ -13,7 +14,7 @@ import type {
   WarehouseVO, CreateWarehouseDTO, UpdateWarehouseDTO,
   StockVO, StockFilters,
   SnCodeVO, CreateSnCodeDTO, UpdateSnCodeDTO, SnFilters,
-  SupplierVO, CreateSupplierDTO, UpdateSupplierDTO,
+  SupplierVO, CreateSupplierDTO, UpdateSupplierDTO, SupplierFilters,
   PurchaseOrderVO, PurchaseOrderItemVO, CreatePurchaseOrderDTO, PurchaseOrderFilters,
   TransferOrderVO, TransferOrderItemVO, CreateTransferOrderDTO, TransferOrderFilters,
   StockMovementVO, StockMovementFilters,
@@ -296,8 +297,7 @@ export class StockRepository implements IStockRepository {
   }
 
   private async query(filters: StockFilters): Promise<PaginatedResult<StockVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = {}
     if (filters.warehouseId) where.warehouseId = filters.warehouseId
     if (filters.variantId) where.variantId = filters.variantId
@@ -310,6 +310,8 @@ export class StockRepository implements IStockRepository {
         ],
       }
     }
+    if (filters.createdBy) where.createdBy = filters.createdBy
+    if (filters.departmentId) where.departmentId = filters.departmentId
 
     const [items, total] = await Promise.all([
       this.prisma.stock.findMany({
@@ -425,8 +427,7 @@ export class SnCodeRepository implements ISnCodeRepository {
   }
 
   private async query(filters: SnFilters): Promise<PaginatedResult<SnCodeVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = {}
     if (filters.variantId) where.variantId = filters.variantId
     if (filters.warehouseId) where.warehouseId = filters.warehouseId
@@ -488,9 +489,8 @@ export class SupplierRepository implements ISupplierRepository {
     return s ? this.toVO(s as unknown as SupplierRow) : null
   }
 
-  async findAll(tenantId: string | null, filters: { search?: string; status?: string; page?: number; perPage?: number }): Promise<PaginatedResult<SupplierVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+  async findAll(tenantId: string | null, filters: SupplierFilters): Promise<PaginatedResult<SupplierVO>> {
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = {}
     if (tenantId) where.tenantId = tenantId
     if (filters.status) where.status = filters.status
@@ -500,6 +500,8 @@ export class SupplierRepository implements ISupplierRepository {
         { contact: { contains: filters.search, mode: 'insensitive' } },
       ]
     }
+    if (filters.createdBy) where.createdBy = filters.createdBy
+    if (filters.departmentId) where.departmentId = filters.departmentId
 
     const [items, total] = await Promise.all([
       this.prisma.supplier.findMany({
@@ -596,8 +598,7 @@ export class PurchaseOrderRepository implements IPurchaseOrderRepository {
   }
 
   async findByTenant(tenantId: string | null, filters: PurchaseOrderFilters): Promise<PaginatedResult<PurchaseOrderVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = {}
     if (tenantId) where.tenantId = tenantId
     if (filters.status) where.status = filters.status
@@ -607,6 +608,8 @@ export class PurchaseOrderRepository implements IPurchaseOrderRepository {
         { poNo: { contains: filters.search, mode: 'insensitive' } },
       ]
     }
+    if (filters.createdBy) where.createdBy = filters.createdBy
+    if (filters.departmentId) where.departmentId = filters.departmentId
 
     const [items, total] = await Promise.all([
       this.prisma.purchaseOrder.findMany({
@@ -629,7 +632,7 @@ export class PurchaseOrderRepository implements IPurchaseOrderRepository {
   }
 
   async create(tenantId: string | null, createdBy: string, dto: CreatePurchaseOrderDTO): Promise<PurchaseOrderVO> {
-    const poNo = `PO-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+    const poNo = generateDocumentNo('PO')
     const totalAmount = dto.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
 
     const po = await this.prisma.purchaseOrder.create({
@@ -735,8 +738,7 @@ export class TransferOrderRepository implements ITransferOrderRepository {
   }
 
   async findAll(filters: TransferOrderFilters): Promise<PaginatedResult<TransferOrderVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = {}
     if (filters.status) where.status = filters.status
     if (filters.fromWarehouseId) where.fromWarehouseId = filters.fromWarehouseId
@@ -746,6 +748,8 @@ export class TransferOrderRepository implements ITransferOrderRepository {
         { transferNo: { contains: filters.search, mode: 'insensitive' } },
       ]
     }
+    if (filters.createdBy) where.createdBy = filters.createdBy
+    if (filters.departmentId) where.departmentId = filters.departmentId
 
     const [items, total] = await Promise.all([
       this.prisma.transferOrder.findMany({
@@ -770,7 +774,7 @@ export class TransferOrderRepository implements ITransferOrderRepository {
   }
 
   async create(requestedBy: string, dto: CreateTransferOrderDTO): Promise<TransferOrderVO> {
-    const transferNo = `TF-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+    const transferNo = generateDocumentNo('TF')
 
     const t = await this.prisma.transferOrder.create({
       data: {
@@ -893,13 +897,14 @@ export class StockMovementRepository implements IStockMovementRepository {
   }
 
   private async query(filters: StockMovementFilters): Promise<PaginatedResult<StockMovementVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = {}
     if (filters.variantId) where.variantId = filters.variantId
     if (filters.warehouseId) where.warehouseId = filters.warehouseId
     if (filters.type) where.type = filters.type
     if (filters.refType) where.refType = filters.refType
+    if (filters.createdBy) where.createdBy = filters.createdBy
+    if (filters.departmentId) where.departmentId = filters.departmentId
 
     const [items, total] = await Promise.all([
       this.prisma.stockMovement.findMany({

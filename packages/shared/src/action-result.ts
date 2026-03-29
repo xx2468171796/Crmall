@@ -56,3 +56,26 @@ export interface SortParams {
 export interface ListParams extends PaginationParams, SortParams {
   search?: string
 }
+
+// ============================================
+// Server Action 统一错误处理包装器
+// ============================================
+
+import { ZodError } from 'zod'
+import { AppError } from './errors'
+
+/**
+ * 包装 Server Action，统一处理 AppError 和 ZodError
+ * - ZodError → VALIDATION_ERROR (修复 ZodError→500 的 bug)
+ * - AppError → fail(e.message, e.code)
+ * - 其他错误 (redirect, auth) → re-throw
+ */
+export async function withAction<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
+  try {
+    return ok(await fn())
+  } catch (e) {
+    if (e instanceof ZodError) return fail(e.issues[0]?.message ?? e.message, 'VALIDATION_ERROR')
+    if (e instanceof AppError) return fail(e.message, e.code)
+    throw e
+  }
+}

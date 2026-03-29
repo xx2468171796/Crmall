@@ -3,6 +3,7 @@
 // ============================================
 
 import type { PrismaClient } from '@twcrm/db'
+import { clampPagination } from '@twcrm/shared'
 import type { PaginatedResult } from '@twcrm/shared'
 import type {
   IPaymentRepository, IDisbursementRepository,
@@ -109,8 +110,7 @@ export class PaymentRepository implements IPaymentRepository {
   }
 
   async findByTenant(tenantId: string, filters: PaymentFilters): Promise<PaginatedResult<PaymentVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = { tenantId }
 
     if (filters.status) where.status = filters.status
@@ -127,6 +127,8 @@ export class PaymentRepository implements IPaymentRepository {
       if (filters.dateTo) paidAt.lte = new Date(filters.dateTo)
       where.paidAt = paidAt
     }
+    if (filters.createdBy) where.createdBy = filters.createdBy
+    if (filters.departmentId) where.departmentId = filters.departmentId
 
     const [items, total] = await Promise.all([
       this.prisma.payment.findMany({
@@ -220,8 +222,7 @@ export class DisbursementRepository implements IDisbursementRepository {
   }
 
   async findByTenant(tenantId: string, filters: DisbursementFilters): Promise<PaginatedResult<DisbursementVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = { tenantId }
 
     if (filters.status) where.status = filters.status
@@ -237,6 +238,8 @@ export class DisbursementRepository implements IDisbursementRepository {
       if (filters.dateTo) createdAt.lte = new Date(filters.dateTo)
       where.createdAt = createdAt
     }
+    if (filters.createdBy) where.createdBy = filters.createdBy
+    if (filters.departmentId) where.departmentId = filters.departmentId
 
     const [items, total] = await Promise.all([
       this.prisma.disbursement.findMany({
@@ -333,8 +336,7 @@ export class InvoiceRepository implements IInvoiceRepository {
   }
 
   async findByTenant(tenantId: string, filters: InvoiceFilters): Promise<PaginatedResult<InvoiceVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = { tenantId }
 
     if (filters.type) where.type = filters.type
@@ -351,6 +353,8 @@ export class InvoiceRepository implements IInvoiceRepository {
       if (filters.dateTo) issueDate.lte = new Date(filters.dateTo)
       where.issueDate = issueDate
     }
+    if (filters.createdBy) where.createdBy = filters.createdBy
+    if (filters.departmentId) where.departmentId = filters.departmentId
 
     const [items, total] = await Promise.all([
       this.prisma.invoice.findMany({
@@ -456,8 +460,7 @@ export class ExpenseRepository implements IExpenseRepository {
   }
 
   async findByTenant(tenantId: string, filters: ExpenseFilters): Promise<PaginatedResult<ExpenseVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = { tenantId }
 
     if (filters.category) where.category = filters.category
@@ -474,6 +477,8 @@ export class ExpenseRepository implements IExpenseRepository {
       if (filters.dateTo) createdAt.lte = new Date(filters.dateTo)
       where.createdAt = createdAt
     }
+    if (filters.createdBy) where.createdBy = filters.createdBy
+    if (filters.departmentId) where.departmentId = filters.departmentId
 
     const [items, total] = await Promise.all([
       this.prisma.expense.findMany({

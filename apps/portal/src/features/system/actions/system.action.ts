@@ -5,8 +5,7 @@ import {
   createAnnouncementService, createNotificationService, createSystemConfigService,
 } from '@/lib/container'
 import { createAnnouncementSchema, updateConfigSchema } from '../schemas/system.schema'
-import { ok, fail, type ActionResult, type PaginatedResult } from '@twcrm/shared'
-import { AppError } from '@twcrm/shared'
+import { withAction, type ActionResult, type PaginatedResult } from '@twcrm/shared'
 import { revalidatePath } from 'next/cache'
 import type {
   AnnouncementVO, AnnouncementFilters,
@@ -16,165 +15,123 @@ import type {
 
 // ---- 公告 ----
 
-export async function getAnnouncementsAction(
+export function getAnnouncementsAction(
   filters: AnnouncementFilters
 ): Promise<ActionResult<PaginatedResult<AnnouncementVO>>> {
-  try {
+  return withAction(async () => {
     const user = await requireAuth()
-    const service = createAnnouncementService()
-    const result = await service.getPublished(user.id, filters)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const service = createAnnouncementService(user.tenantId, user.isPlatform)
+    return service.getPublished(user.id, filters)
+  })
 }
 
-export async function getAllAnnouncementsAction(
+export function getAllAnnouncementsAction(
   filters: AnnouncementFilters
 ): Promise<ActionResult<PaginatedResult<AnnouncementVO>>> {
-  try {
-    await requirePlatform()
-    const service = createAnnouncementService()
-    const result = await service.getAll(filters)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+  return withAction(async () => {
+    const user = await requirePlatform()
+    const service = createAnnouncementService(user.tenantId, user.isPlatform)
+    return service.getAll(filters)
+  })
 }
 
-export async function createAnnouncementAction(input: unknown): Promise<ActionResult<AnnouncementVO>> {
-  try {
+export function createAnnouncementAction(input: unknown): Promise<ActionResult<AnnouncementVO>> {
+  return withAction(async () => {
     const user = await requirePlatform()
     const dto = createAnnouncementSchema.parse(input)
-    const service = createAnnouncementService()
+    const service = createAnnouncementService(user.tenantId, user.isPlatform)
     const result = await service.create(dto, user.id)
     revalidatePath('/platform/announcements')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }
 
-export async function publishAnnouncementAction(id: string): Promise<ActionResult<null>> {
-  try {
-    await requirePlatform()
-    const service = createAnnouncementService()
+export function publishAnnouncementAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
+    const user = await requirePlatform()
+    const service = createAnnouncementService(user.tenantId, user.isPlatform)
     await service.publish(id)
     revalidatePath('/platform/announcements')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
-export async function markAnnouncementReadAction(id: string): Promise<ActionResult<null>> {
-  try {
+export function markAnnouncementReadAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
     const user = await requireAuth()
-    const service = createAnnouncementService()
+    const service = createAnnouncementService(user.tenantId, user.isPlatform)
     await service.markRead(id, user.id)
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
 // ---- 通知 ----
 
-export async function getNotificationsAction(
+export function getNotificationsAction(
   filters: NotificationFilters
 ): Promise<ActionResult<PaginatedResult<NotificationVO>>> {
-  try {
+  return withAction(async () => {
     const user = await requireAuth()
-    const service = createNotificationService()
-    const result = await service.getNotifications(user.id, filters)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const service = createNotificationService(user.tenantId, user.isPlatform)
+    return service.getNotifications(user.id, filters)
+  })
 }
 
-export async function getUnreadCountAction(): Promise<ActionResult<number>> {
-  try {
+export function getUnreadCountAction(): Promise<ActionResult<number>> {
+  return withAction(async () => {
     const user = await requireAuth()
-    const service = createNotificationService()
-    const count = await service.getUnreadCount(user.id)
-    return ok(count)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const service = createNotificationService(user.tenantId, user.isPlatform)
+    return service.getUnreadCount(user.id)
+  })
 }
 
-export async function markNotificationReadAction(id: string): Promise<ActionResult<null>> {
-  try {
-    await requireAuth()
-    const service = createNotificationService()
+export function markNotificationReadAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
+    const user = await requireAuth()
+    const service = createNotificationService(user.tenantId, user.isPlatform)
     await service.markRead(id)
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
-export async function markAllNotificationsReadAction(): Promise<ActionResult<null>> {
-  try {
+export function markAllNotificationsReadAction(): Promise<ActionResult<null>> {
+  return withAction(async () => {
     const user = await requireAuth()
-    const service = createNotificationService()
+    const service = createNotificationService(user.tenantId, user.isPlatform)
     await service.markAllRead(user.id)
     revalidatePath('/notifications')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
 // ---- 配置管理 ----
 
-export async function getConfigGroupsAction(): Promise<ActionResult<string[]>> {
-  try {
-    await requirePlatform()
-    const service = createSystemConfigService()
-    const groups = await service.getAllGroups()
-    return ok(groups)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+export function getConfigGroupsAction(): Promise<ActionResult<string[]>> {
+  return withAction(async () => {
+    const user = await requirePlatform()
+    const service = createSystemConfigService(user.tenantId, user.isPlatform)
+    return service.getAllGroups()
+  })
 }
 
-export async function getConfigsByGroupAction(
+export function getConfigsByGroupAction(
   group: string,
   tenantId?: string
 ): Promise<ActionResult<ConfigItemVO[]>> {
-  try {
-    await requirePlatform()
-    const service = createSystemConfigService()
-    const items = await service.getConfigsByGroup(group, tenantId)
-    return ok(items)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+  return withAction(async () => {
+    const user = await requirePlatform()
+    const service = createSystemConfigService(user.tenantId, user.isPlatform)
+    return service.getConfigsByGroup(group, tenantId)
+  })
 }
 
-export async function updateConfigAction(input: unknown): Promise<ActionResult<ConfigItemVO>> {
-  try {
-    await requirePlatform()
+export function updateConfigAction(input: unknown): Promise<ActionResult<ConfigItemVO>> {
+  return withAction(async () => {
+    const user = await requirePlatform()
     const dto = updateConfigSchema.parse(input)
-    const service = createSystemConfigService()
+    const service = createSystemConfigService(user.tenantId, user.isPlatform)
     const result = await service.updateConfig(dto)
     revalidatePath('/platform/settings')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }

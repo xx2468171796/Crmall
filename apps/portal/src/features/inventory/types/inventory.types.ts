@@ -60,6 +60,8 @@ export interface StockFilters {
   lowStock?: boolean
   page?: number
   perPage?: number
+  createdBy?: string
+  departmentId?: string
 }
 
 export interface StockAdjustDTO {
@@ -202,6 +204,8 @@ export interface PurchaseOrderFilters {
   supplierId?: string
   page?: number
   perPage?: number
+  createdBy?: string
+  departmentId?: string
 }
 
 export interface ReceivePurchaseItemDTO {
@@ -255,6 +259,8 @@ export interface TransferOrderFilters {
   toWarehouseId?: string
   page?: number
   perPage?: number
+  createdBy?: string
+  departmentId?: string
 }
 
 export interface ReceiveTransferItemDTO {
@@ -289,4 +295,15 @@ export interface StockMovementFilters {
   refType?: string
   page?: number
   perPage?: number
+  createdBy?: string
+  departmentId?: string
+}
+
+export interface SupplierFilters {
+  search?: string
+  status?: string
+  page?: number
+  perPage?: number
+  createdBy?: string
+  departmentId?: string
 }

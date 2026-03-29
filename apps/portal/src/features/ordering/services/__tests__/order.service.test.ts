@@ -5,6 +5,30 @@ import type { IConfigService } from '@twcrm/shared'
 import { BusinessRuleError, InsufficientBalanceError } from '@twcrm/shared'
 import type { CartItemVO, OrderVO } from '../../types/ordering.types'
 
+// ---- Module mocks ----
+// Hoisted refs let the vi.mock factories below close over the live mock instances
+// that are replaced in beforeEach, so $transaction delegates to the correct mocks.
+const hoisted = vi.hoisted(() => ({
+  txOrderCreate: vi.fn(),
+  txAccountDeduct: vi.fn(),
+  txCartClearCart: vi.fn(),
+}))
+
+vi.mock('@twcrm/db', () => ({
+  prisma: {
+    $transaction: vi.fn((cb: (tx: unknown) => unknown) => cb({})),
+  },
+}))
+
+vi.mock('../../repositories/ordering.repository', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  OrderRepository: vi.fn(function (this: any) { this.create = hoisted.txOrderCreate }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  AccountRepository: vi.fn(function (this: any) { this.deduct = hoisted.txAccountDeduct }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  CartRepository: vi.fn(function (this: any) { this.clearCart = hoisted.txCartClearCart }),
+}))
+
 // ---- Helpers ----
 
 function makeCartItem(overrides: Partial<CartItemVO> = {}): CartItemVO {
@@ -93,8 +117,14 @@ describe('OrderService', () => {
   }
 
   beforeEach(() => {
+    // Reset hoisted tx mocks so they are fresh each test
+    hoisted.txOrderCreate.mockReset()
+    hoisted.txAccountDeduct.mockReset()
+    hoisted.txCartClearCart.mockReset()
+
     mockOrderRepo = {
-      create: vi.fn(),
+      // Wire the DI-injected repo's create to the same fn used inside the transaction
+      create: hoisted.txOrderCreate,
       findById: vi.fn(),
       findByTenant: vi.fn(),
       findAll: vi.fn(),
@@ -106,7 +136,8 @@ describe('OrderService', () => {
       addItem: vi.fn(),
       updateItem: vi.fn(),
       removeItem: vi.fn(),
-      clearCart: vi.fn(),
+      // Wire clearCart to the same fn used inside the transaction
+      clearCart: hoisted.txCartClearCart,
     }
     mockCatalogRepo = {
       findProducts: vi.fn(),
@@ -114,7 +145,8 @@ describe('OrderService', () => {
     }
     mockAccountRepo = {
       findByTenantId: vi.fn(),
-      deduct: vi.fn(),
+      // Wire deduct to the same fn used inside the transaction
+      deduct: hoisted.txAccountDeduct,
       refund: vi.fn(),
     }
     mockShipmentRepo = {

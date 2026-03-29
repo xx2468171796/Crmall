@@ -4,13 +4,13 @@ import { requirePermission } from '@/lib/container'
 import {
   createCustomerService, createOpportunityService, createFollowUpService,
 } from '@/lib/container'
+import { getDataScopeFilter } from '@/lib/data-scope'
 import {
   createCustomerSchema, updateCustomerSchema,
   createOpportunitySchema, updateOpportunitySchema,
   createFollowUpSchema,
 } from '../schemas/crm.schema'
-import { ok, fail, type ActionResult, type PaginatedResult } from '@twcrm/shared'
-import { AppError } from '@twcrm/shared'
+import { withAction, type ActionResult, type PaginatedResult } from '@twcrm/shared'
 import { revalidatePath } from 'next/cache'
 import type {
   CustomerVO, CustomerFilters,
@@ -20,182 +20,141 @@ import type {
 
 // ---- 客户 ----
 
-export async function getCustomersAction(
+export function getCustomersAction(
   filters: CustomerFilters
 ): Promise<ActionResult<PaginatedResult<CustomerVO>>> {
-  try {
+  return withAction(async () => {
     const user = await requirePermission('crm:read:customer')
-    const service = createCustomerService()
-    const result = await service.getCustomers(user.tenantId, filters)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const scopeFilter = getDataScopeFilter(user, 'crm:read:customer')
+    const service = createCustomerService(user.tenantId, user.isPlatform)
+    return service.getCustomers(user.tenantId, { ...filters, ...scopeFilter })
+  })
 }
 
-export async function getCustomerByIdAction(id: string): Promise<ActionResult<CustomerVO | null>> {
-  try {
-    await requirePermission('crm:read:customer')
-    const service = createCustomerService()
-    return ok(await service.getCustomerById(id))
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+export function getCustomerByIdAction(id: string): Promise<ActionResult<CustomerVO | null>> {
+  return withAction(async () => {
+    const user = await requirePermission('crm:read:customer')
+    const service = createCustomerService(user.tenantId, user.isPlatform)
+    return service.getCustomerById(id)
+  })
 }
 
-export async function createCustomerAction(input: unknown): Promise<ActionResult<CustomerVO>> {
-  try {
+export function createCustomerAction(input: unknown): Promise<ActionResult<CustomerVO>> {
+  return withAction(async () => {
     const user = await requirePermission('crm:create:customer')
     const dto = createCustomerSchema.parse(input)
-    const service = createCustomerService()
+    const service = createCustomerService(user.tenantId, user.isPlatform)
     const result = await service.createCustomer(user.tenantId, dto, user.id)
     revalidatePath('/customers')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }
 
-export async function updateCustomerAction(id: string, input: unknown): Promise<ActionResult<CustomerVO>> {
-  try {
-    await requirePermission('crm:update:customer')
+export function updateCustomerAction(id: string, input: unknown): Promise<ActionResult<CustomerVO>> {
+  return withAction(async () => {
+    const user = await requirePermission('crm:update:customer')
     const dto = updateCustomerSchema.parse(input)
-    const service = createCustomerService()
+    const service = createCustomerService(user.tenantId, user.isPlatform)
     const result = await service.updateCustomer(id, dto)
     revalidatePath('/customers')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }
 
-export async function deleteCustomerAction(id: string): Promise<ActionResult<null>> {
-  try {
-    await requirePermission('crm:delete:customer')
-    const service = createCustomerService()
+export function deleteCustomerAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
+    const user = await requirePermission('crm:delete:customer')
+    const service = createCustomerService(user.tenantId, user.isPlatform)
     await service.deleteCustomer(id)
     revalidatePath('/customers')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
 // ---- 商机 ----
 
-export async function getOpportunitiesAction(
+export function getOpportunitiesAction(
   filters: OpportunityFilters
 ): Promise<ActionResult<PaginatedResult<OpportunityVO>>> {
-  try {
+  return withAction(async () => {
     const user = await requirePermission('crm:read:opportunity')
-    const service = createOpportunityService()
-    const result = await service.getOpportunities(user.tenantId, filters)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const scopeFilter = getDataScopeFilter(user, 'crm:read:opportunity')
+    const service = createOpportunityService(user.tenantId, user.isPlatform)
+    return service.getOpportunities(user.tenantId, { ...filters, ...scopeFilter })
+  })
 }
 
-export async function createOpportunityAction(input: unknown): Promise<ActionResult<OpportunityVO>> {
-  try {
+export function createOpportunityAction(input: unknown): Promise<ActionResult<OpportunityVO>> {
+  return withAction(async () => {
     const user = await requirePermission('crm:create:opportunity')
     const dto = createOpportunitySchema.parse(input)
-    const service = createOpportunityService()
+    const service = createOpportunityService(user.tenantId, user.isPlatform)
     const result = await service.createOpportunity(user.tenantId, dto, user.id)
     revalidatePath('/opportunities')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }
 
-export async function updateOpportunityAction(id: string, input: unknown): Promise<ActionResult<OpportunityVO>> {
-  try {
-    await requirePermission('crm:update:opportunity')
+export function updateOpportunityAction(id: string, input: unknown): Promise<ActionResult<OpportunityVO>> {
+  return withAction(async () => {
+    const user = await requirePermission('crm:update:opportunity')
     const dto = updateOpportunitySchema.parse(input)
-    const service = createOpportunityService()
+    const service = createOpportunityService(user.tenantId, user.isPlatform)
     const result = await service.updateOpportunity(id, dto)
     revalidatePath('/opportunities')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }
 
-export async function updateOpportunityStageAction(id: string, stage: string): Promise<ActionResult<OpportunityVO>> {
-  try {
-    await requirePermission('crm:update:opportunity')
-    const service = createOpportunityService()
+export function updateOpportunityStageAction(id: string, stage: string): Promise<ActionResult<OpportunityVO>> {
+  return withAction(async () => {
+    const user = await requirePermission('crm:update:opportunity')
+    const service = createOpportunityService(user.tenantId, user.isPlatform)
     const result = await service.updateStage(id, stage)
     revalidatePath('/opportunities')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }
 
-export async function deleteOpportunityAction(id: string): Promise<ActionResult<null>> {
-  try {
-    await requirePermission('crm:delete:opportunity')
-    const service = createOpportunityService()
+export function deleteOpportunityAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
+    const user = await requirePermission('crm:delete:opportunity')
+    const service = createOpportunityService(user.tenantId, user.isPlatform)
     await service.deleteOpportunity(id)
     revalidatePath('/opportunities')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
-export async function getOpportunityStagesAction(): Promise<ActionResult<string[]>> {
-  try {
+export function getOpportunityStagesAction(): Promise<ActionResult<string[]>> {
+  return withAction(async () => {
     const user = await requirePermission('crm:read:opportunity')
-    const service = createOpportunityService()
-    const stages = await service.getStages(user.tenantId)
-    return ok(stages)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const service = createOpportunityService(user.tenantId, user.isPlatform)
+    return service.getStages(user.tenantId)
+  })
 }
 
 // ---- 跟进 ----
 
-export async function getFollowUpsAction(
+export function getFollowUpsAction(
   customerId?: string,
   opportunityId?: string
 ): Promise<ActionResult<FollowUpVO[]>> {
-  try {
-    await requirePermission('crm:read:followup')
-    const service = createFollowUpService()
-    const result = await service.getFollowUps(customerId, opportunityId)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+  return withAction(async () => {
+    const user = await requirePermission('crm:read:followup')
+    const service = createFollowUpService(user.tenantId, user.isPlatform)
+    return service.getFollowUps(customerId, opportunityId)
+  })
 }
 
-export async function createFollowUpAction(input: unknown): Promise<ActionResult<FollowUpVO>> {
-  try {
+export function createFollowUpAction(input: unknown): Promise<ActionResult<FollowUpVO>> {
+  return withAction(async () => {
     const user = await requirePermission('crm:create:followup')
     const dto = createFollowUpSchema.parse(input)
-    const service = createFollowUpService()
+    const service = createFollowUpService(user.tenantId, user.isPlatform)
     const result = await service.createFollowUp(user.tenantId, dto, user.id)
     revalidatePath('/customers')
     revalidatePath('/opportunities')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }

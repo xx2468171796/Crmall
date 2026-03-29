@@ -10,8 +10,7 @@ import {
   addToCartSchema, updateCartSchema,
   createOrderSchema, shipOrderSchema,
 } from '../schemas/order.schema'
-import { ok, fail, type ActionResult, type PaginatedResult } from '@twcrm/shared'
-import { AppError } from '@twcrm/shared'
+import { withAction, type ActionResult, type PaginatedResult } from '@twcrm/shared'
 import { revalidatePath } from 'next/cache'
 import type {
   CatalogProductVO, CatalogFilters,
@@ -21,222 +20,170 @@ import type {
 
 // ---- 产品目录 ----
 
-export async function getCatalogAction(
+export function getCatalogAction(
   filters: CatalogFilters
 ): Promise<ActionResult<PaginatedResult<CatalogProductVO>>> {
-  try {
+  return withAction(async () => {
     const user = await requirePermission('ordering:read:catalog')
-    const service = createCatalogService()
-    const result = await service.getProducts(user.tenantId, filters)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const service = createCatalogService(user.tenantId, user.isPlatform)
+    return service.getProducts(user.tenantId, filters)
+  })
 }
 
-export async function getCatalogProductAction(
+export function getCatalogProductAction(
   id: string
 ): Promise<ActionResult<CatalogProductVO | null>> {
-  try {
+  return withAction(async () => {
     const user = await requirePermission('ordering:read:catalog')
-    const service = createCatalogService()
-    const result = await service.getProductById(id, user.tenantId)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const service = createCatalogService(user.tenantId, user.isPlatform)
+    return service.getProductById(id, user.tenantId)
+  })
 }
 
 // ---- 购物车 ----
 
-export async function getCartAction(): Promise<ActionResult<CartItemVO[]>> {
-  try {
+export function getCartAction(): Promise<ActionResult<CartItemVO[]>> {
+  return withAction(async () => {
     const user = await requirePermission('ordering:read:cart')
-    const service = createCartService()
-    const result = await service.getCart(user.tenantId, user.id)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const service = createCartService(user.tenantId, user.isPlatform)
+    return service.getCart(user.tenantId, user.id)
+  })
 }
 
-export async function addToCartAction(input: unknown): Promise<ActionResult<CartItemVO>> {
-  try {
+export function addToCartAction(input: unknown): Promise<ActionResult<CartItemVO>> {
+  return withAction(async () => {
     const user = await requirePermission('ordering:create:cart')
     const dto = addToCartSchema.parse(input)
-    const service = createCartService()
+    const service = createCartService(user.tenantId, user.isPlatform)
     const result = await service.addToCart(user.tenantId, user.id, dto)
     revalidatePath('/ordering/cart')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }
 
-export async function updateCartItemAction(
+export function updateCartItemAction(
   id: string,
   input: unknown
 ): Promise<ActionResult<CartItemVO>> {
-  try {
-    await requirePermission('ordering:update:cart')
+  return withAction(async () => {
+    const user = await requirePermission('ordering:update:cart')
     const dto = updateCartSchema.parse(input)
-    const service = createCartService()
+    const service = createCartService(user.tenantId, user.isPlatform)
     const result = await service.updateCartItem(id, dto)
     revalidatePath('/ordering/cart')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }
 
-export async function removeCartItemAction(id: string): Promise<ActionResult<null>> {
-  try {
-    await requirePermission('ordering:delete:cart')
-    const service = createCartService()
+export function removeCartItemAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
+    const user = await requirePermission('ordering:delete:cart')
+    const service = createCartService(user.tenantId, user.isPlatform)
     await service.removeCartItem(id)
     revalidatePath('/ordering/cart')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
 // ---- 订单 ----
 
-export async function createOrderAction(input: unknown): Promise<ActionResult<OrderVO>> {
-  try {
+export function createOrderAction(input: unknown): Promise<ActionResult<OrderVO>> {
+  return withAction(async () => {
     const user = await requirePermission('ordering:create:order')
     const dto = createOrderSchema.parse(input)
-    const service = createOrderService()
+    const service = createOrderService(user.tenantId, user.isPlatform)
     const result = await service.createOrder(user.tenantId, user.id, dto)
     revalidatePath('/ordering/orders')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }
 
-export async function getOrdersAction(
+export function getOrdersAction(
   filters: OrderFilters
 ): Promise<ActionResult<PaginatedResult<OrderVO>>> {
-  try {
+  return withAction(async () => {
     const user = await requirePermission('ordering:read:order')
-    const service = createOrderService()
+    const service = createOrderService(user.tenantId, user.isPlatform)
     const scopeFilter = getDataScopeFilter(user, 'ordering:read:order')
     const scopedFilters = { ...filters, ...scopeFilter }
-    const result = user.isPlatform
-      ? await service.getAllOrders(filters)
-      : await service.getOrders(user.tenantId, scopedFilters)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return user.isPlatform
+      ? service.getAllOrders(filters)
+      : service.getOrders(user.tenantId, scopedFilters)
+  })
 }
 
-export async function getOrderByIdAction(id: string): Promise<ActionResult<OrderVO | null>> {
-  try {
-    await requirePermission('ordering:read:order')
-    const service = createOrderService()
-    const result = await service.getOrderById(id)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+export function getOrderByIdAction(id: string): Promise<ActionResult<OrderVO | null>> {
+  return withAction(async () => {
+    const user = await requirePermission('ordering:read:order')
+    const service = createOrderService(user.tenantId, user.isPlatform)
+    return service.getOrderById(id)
+  })
 }
 
-export async function confirmOrderAction(id: string): Promise<ActionResult<null>> {
-  try {
-    await requirePlatform()
-    const service = createOrderService()
+export function confirmOrderAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
+    const user = await requirePlatform()
+    const service = createOrderService(user.tenantId, user.isPlatform)
     await service.confirmOrder(id)
     revalidatePath('/ordering/orders')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
-export async function cancelOrderAction(
+export function cancelOrderAction(
   id: string,
   reason: string
 ): Promise<ActionResult<null>> {
-  try {
+  return withAction(async () => {
     const user = await requirePermission('ordering:update:order')
-    const service = createOrderService()
+    const service = createOrderService(user.tenantId, user.isPlatform)
     await service.cancelOrder(id, reason, user.id)
     revalidatePath('/ordering/orders')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
-export async function shipOrderAction(
+export function shipOrderAction(
   orderId: string,
   input: unknown
 ): Promise<ActionResult<ShipmentVO>> {
-  try {
-    await requirePlatform()
+  return withAction(async () => {
+    const user = await requirePlatform()
     const dto = shipOrderSchema.parse(input)
-    const service = createOrderService()
+    const service = createOrderService(user.tenantId, user.isPlatform)
     const shipment = await service.shipOrder(orderId, dto)
     revalidatePath('/ordering/orders')
     revalidatePath('/platform/orders')
-    return ok(shipment)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return shipment
+  })
 }
 
-export async function confirmReceiveAction(shipmentId: string): Promise<ActionResult<null>> {
-  try {
-    await requirePermission('ordering:update:order')
-    const service = createOrderService()
+export function confirmReceiveAction(shipmentId: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
+    const user = await requirePermission('ordering:update:order')
+    const service = createOrderService(user.tenantId, user.isPlatform)
     await service.confirmReceive(shipmentId)
     revalidatePath('/ordering/orders')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
 // ---- 账户 ----
 
-export async function getAccountAction(): Promise<ActionResult<TenantAccountVO | null>> {
-  try {
+export function getAccountAction(): Promise<ActionResult<TenantAccountVO | null>> {
+  return withAction(async () => {
     const user = await requirePermission('ordering:read:account')
-    const service = createAccountService()
-    const result = await service.getAccount(user.tenantId)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const service = createAccountService(user.tenantId, user.isPlatform)
+    return service.getAccount(user.tenantId)
+  })
 }
 
-export async function getTransactionsAction(
+export function getTransactionsAction(
   page?: number, perPage?: number
 ): Promise<ActionResult<{ items: AccountTransactionVO[]; total: number }>> {
-  try {
+  return withAction(async () => {
     const user = await requirePermission('ordering:read:account')
-    const service = createAccountService()
-    const result = await service.getTransactions(user.tenantId, page, perPage)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const service = createAccountService(user.tenantId, user.isPlatform)
+    return service.getTransactions(user.tenantId, page, perPage)
+  })
 }

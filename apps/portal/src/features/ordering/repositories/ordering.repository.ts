@@ -3,6 +3,7 @@
 // ============================================
 
 import type { PrismaClient } from '@twcrm/db'
+import { clampPagination } from '@twcrm/shared'
 import type { PaginatedResult } from '@twcrm/shared'
 import type {
   ICatalogRepository, ICartRepository, IOrderRepository,
@@ -186,8 +187,7 @@ export class CatalogRepository implements ICatalogRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findProducts(tenantId: string, filters: CatalogFilters): Promise<PaginatedResult<CatalogProductVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = { status: filters.status ?? 'active' }
     if (filters.categoryId) where.categoryId = filters.categoryId
     if (filters.search) {
@@ -490,8 +490,7 @@ export class OrderRepository implements IOrderRepository {
   }
 
   private async query(filters: OrderQueryFilters): Promise<PaginatedResult<OrderVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = {}
     if (filters.tenantId) where.tenantId = filters.tenantId
     if (filters.status) where.status = filters.status
@@ -657,7 +656,8 @@ export class AccountRepository implements IAccountRepository {
     return a ? { id: a.id, tenantId: a.tenantId, balance: Number(a.balance), creditLimit: Number(a.creditLimit), currency: a.currency } : null
   }
 
-  async findTransactions(tenantId: string, page = 1, perPage = 20): Promise<{ items: AccountTransactionVO[]; total: number }> {
+  async findTransactions(tenantId: string, rawPage = 1, rawPerPage = 20): Promise<{ items: AccountTransactionVO[]; total: number }> {
+    const { page, perPage } = clampPagination(rawPage, rawPerPage)
     const account = await this.prisma.tenantAccount.findUnique({ where: { tenantId } })
     if (!account) return { items: [], total: 0 }
 

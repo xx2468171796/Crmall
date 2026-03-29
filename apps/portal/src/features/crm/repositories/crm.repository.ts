@@ -3,6 +3,7 @@
 // ============================================
 
 import type { PrismaClient } from '@twcrm/db'
+import { clampPagination } from '@twcrm/shared'
 import type { PaginatedResult } from '@twcrm/shared'
 import type { ICustomerRepository, IOpportunityRepository, IFollowUpRepository } from './crm.repository.interface'
 import type {
@@ -76,13 +77,14 @@ export class CustomerRepository implements ICustomerRepository {
   }
 
   async findByTenant(tenantId: string, filters: CustomerFilters): Promise<PaginatedResult<CustomerVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = { tenantId }
     if (filters.status) where.status = filters.status
     if (filters.level) where.level = filters.level
     if (filters.source) where.source = filters.source
     if (filters.ownerId) where.ownerId = filters.ownerId
+    if (filters.createdBy) where.createdBy = filters.createdBy
+    if (filters.departmentId) where.departmentId = filters.departmentId
     if (filters.search) {
       where.OR = [
         { name: { contains: filters.search, mode: 'insensitive' } },
@@ -157,12 +159,13 @@ export class OpportunityRepository implements IOpportunityRepository {
   }
 
   async findByTenant(tenantId: string, filters: OpportunityFilters): Promise<PaginatedResult<OpportunityVO>> {
-    const page = filters.page ?? 1
-    const perPage = filters.perPage ?? 20
+    const { page, perPage } = clampPagination(filters.page, filters.perPage)
     const where: Record<string, unknown> = { tenantId }
     if (filters.stage) where.stage = filters.stage
     if (filters.ownerId) where.ownerId = filters.ownerId
     if (filters.customerId) where.customerId = filters.customerId
+    if (filters.createdBy) where.createdBy = filters.createdBy
+    if (filters.departmentId) where.departmentId = filters.departmentId
     if (filters.search) {
       where.OR = [{ title: { contains: filters.search, mode: 'insensitive' } }]
     }

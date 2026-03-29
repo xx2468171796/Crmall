@@ -9,8 +9,8 @@ import {
   createPaymentSchema, createDisbursementSchema,
   createInvoiceSchema, createExpenseSchema,
 } from '../schemas/finance.schema'
-import { ok, fail, type ActionResult, type PaginatedResult } from '@twcrm/shared'
-import { AppError } from '@twcrm/shared'
+import { withAction, type ActionResult, type PaginatedResult } from '@twcrm/shared'
+import { getDataScopeFilter } from '@/lib/data-scope'
 import { revalidatePath } from 'next/cache'
 import type {
   PaymentVO, PaymentFilters,
@@ -23,243 +23,192 @@ import type {
 // 收款 (Payment) Actions
 // ============================================
 
-export async function createPaymentAction(input: unknown): Promise<ActionResult<PaymentVO>> {
-  try {
+export function createPaymentAction(input: unknown): Promise<ActionResult<PaymentVO>> {
+  return withAction(async () => {
     const user = await requirePermission('finance:create:payment')
     const dto = createPaymentSchema.parse(input)
-    const service = createPaymentService()
+    const service = createPaymentService(user.tenantId, user.isPlatform)
     const result = await service.create(user.tenantId, user.id, dto)
     revalidatePath('/finance/payments')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }
 
-export async function getPaymentsAction(
+export function getPaymentsAction(
   filters: PaymentFilters
 ): Promise<ActionResult<PaginatedResult<PaymentVO>>> {
-  try {
+  return withAction(async () => {
     const user = await requirePermission('finance:read:payment')
-    const service = createPaymentService()
-    const result = await service.getPayments(user.tenantId, filters)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const scopeFilter = getDataScopeFilter(user, 'finance:read:payment')
+    const service = createPaymentService(user.tenantId, user.isPlatform)
+    return service.getPayments(user.tenantId, { ...filters, ...scopeFilter })
+  })
 }
 
-export async function confirmPaymentAction(id: string): Promise<ActionResult<null>> {
-  try {
+export function confirmPaymentAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
     const user = await requirePermission('finance:approve:payment')
-    const service = createPaymentService()
+    const service = createPaymentService(user.tenantId, user.isPlatform)
     await service.confirm(id, user.id)
     revalidatePath('/finance/payments')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
-export async function refundPaymentAction(id: string): Promise<ActionResult<null>> {
-  try {
-    await requirePermission('finance:update:payment')
-    const service = createPaymentService()
+export function refundPaymentAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
+    const user = await requirePermission('finance:update:payment')
+    const service = createPaymentService(user.tenantId, user.isPlatform)
     await service.refund(id)
     revalidatePath('/finance/payments')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
 // ============================================
 // 付款 (Disbursement) Actions
 // ============================================
 
-export async function createDisbursementAction(input: unknown): Promise<ActionResult<DisbursementVO>> {
-  try {
+export function createDisbursementAction(input: unknown): Promise<ActionResult<DisbursementVO>> {
+  return withAction(async () => {
     const user = await requirePermission('finance:create:disbursement')
     const dto = createDisbursementSchema.parse(input)
-    const service = createDisbursementService()
+    const service = createDisbursementService(user.tenantId, user.isPlatform)
     const result = await service.create(user.tenantId, user.id, dto)
     revalidatePath('/finance/disbursements')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }
 
-export async function getDisbursementsAction(
+export function getDisbursementsAction(
   filters: DisbursementFilters
 ): Promise<ActionResult<PaginatedResult<DisbursementVO>>> {
-  try {
+  return withAction(async () => {
     const user = await requirePermission('finance:read:disbursement')
-    const service = createDisbursementService()
-    const result = await service.getDisbursements(user.tenantId, filters)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const scopeFilter = getDataScopeFilter(user, 'finance:read:disbursement')
+    const service = createDisbursementService(user.tenantId, user.isPlatform)
+    return service.getDisbursements(user.tenantId, { ...filters, ...scopeFilter })
+  })
 }
 
-export async function approveDisbursementAction(id: string): Promise<ActionResult<null>> {
-  try {
+export function approveDisbursementAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
     const user = await requirePermission('finance:approve:disbursement')
-    const service = createDisbursementService()
+    const service = createDisbursementService(user.tenantId, user.isPlatform)
     await service.approve(id, user.id)
     revalidatePath('/finance/disbursements')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
-export async function markDisbursementPaidAction(id: string): Promise<ActionResult<null>> {
-  try {
-    await requirePermission('finance:update:disbursement')
-    const service = createDisbursementService()
+export function markDisbursementPaidAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
+    const user = await requirePermission('finance:update:disbursement')
+    const service = createDisbursementService(user.tenantId, user.isPlatform)
     await service.markPaid(id)
     revalidatePath('/finance/disbursements')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
 // ============================================
 // 发票 (Invoice) Actions
 // ============================================
 
-export async function createInvoiceAction(input: unknown): Promise<ActionResult<InvoiceVO>> {
-  try {
+export function createInvoiceAction(input: unknown): Promise<ActionResult<InvoiceVO>> {
+  return withAction(async () => {
     const user = await requirePermission('finance:create:invoice')
     const dto = createInvoiceSchema.parse(input)
-    const service = createInvoiceService()
+    const service = createInvoiceService(user.tenantId, user.isPlatform)
     const result = await service.create(user.tenantId, user.id, dto)
     revalidatePath('/finance/invoices')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }
 
-export async function getInvoicesAction(
+export function getInvoicesAction(
   filters: InvoiceFilters
 ): Promise<ActionResult<PaginatedResult<InvoiceVO>>> {
-  try {
+  return withAction(async () => {
     const user = await requirePermission('finance:read:invoice')
-    const service = createInvoiceService()
-    const result = await service.getInvoices(user.tenantId, filters)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const scopeFilter = getDataScopeFilter(user, 'finance:read:invoice')
+    const service = createInvoiceService(user.tenantId, user.isPlatform)
+    return service.getInvoices(user.tenantId, { ...filters, ...scopeFilter })
+  })
 }
 
-export async function issueInvoiceAction(id: string): Promise<ActionResult<null>> {
-  try {
-    await requirePermission('finance:update:invoice')
-    const service = createInvoiceService()
+export function issueInvoiceAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
+    const user = await requirePermission('finance:update:invoice')
+    const service = createInvoiceService(user.tenantId, user.isPlatform)
     await service.issue(id)
     revalidatePath('/finance/invoices')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
-export async function voidInvoiceAction(id: string): Promise<ActionResult<null>> {
-  try {
-    await requirePermission('finance:delete:invoice')
-    const service = createInvoiceService()
+export function voidInvoiceAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
+    const user = await requirePermission('finance:delete:invoice')
+    const service = createInvoiceService(user.tenantId, user.isPlatform)
     await service.void(id)
     revalidatePath('/finance/invoices')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
 // ============================================
 // 费用报销 (Expense) Actions
 // ============================================
 
-export async function createExpenseAction(input: unknown): Promise<ActionResult<ExpenseVO>> {
-  try {
+export function createExpenseAction(input: unknown): Promise<ActionResult<ExpenseVO>> {
+  return withAction(async () => {
     const user = await requirePermission('finance:create:expense')
     const dto = createExpenseSchema.parse(input)
-    const service = createExpenseService()
+    const service = createExpenseService(user.tenantId, user.isPlatform)
     const result = await service.create(user.tenantId, user.id, dto)
     revalidatePath('/finance/expenses')
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return result
+  })
 }
 
-export async function getExpensesAction(
+export function getExpensesAction(
   filters: ExpenseFilters
 ): Promise<ActionResult<PaginatedResult<ExpenseVO>>> {
-  try {
+  return withAction(async () => {
     const user = await requirePermission('finance:read:expense')
-    const service = createExpenseService()
-    const result = await service.getExpenses(user.tenantId, filters)
-    return ok(result)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    const scopeFilter = getDataScopeFilter(user, 'finance:read:expense')
+    const service = createExpenseService(user.tenantId, user.isPlatform)
+    return service.getExpenses(user.tenantId, { ...filters, ...scopeFilter })
+  })
 }
 
-export async function approveExpenseAction(id: string): Promise<ActionResult<null>> {
-  try {
+export function approveExpenseAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
     const user = await requirePermission('finance:approve:expense')
-    const service = createExpenseService()
+    const service = createExpenseService(user.tenantId, user.isPlatform)
     await service.approve(id, user.id)
     revalidatePath('/finance/expenses')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
-export async function rejectExpenseAction(id: string): Promise<ActionResult<null>> {
-  try {
-    await requirePermission('finance:approve:expense')
-    const service = createExpenseService()
+export function rejectExpenseAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
+    const user = await requirePermission('finance:approve:expense')
+    const service = createExpenseService(user.tenantId, user.isPlatform)
     await service.reject(id)
     revalidatePath('/finance/expenses')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
 
-export async function markExpensePaidAction(id: string): Promise<ActionResult<null>> {
-  try {
-    await requirePermission('finance:update:expense')
-    const service = createExpenseService()
+export function markExpensePaidAction(id: string): Promise<ActionResult<null>> {
+  return withAction(async () => {
+    const user = await requirePermission('finance:update:expense')
+    const service = createExpenseService(user.tenantId, user.isPlatform)
     await service.markPaid(id)
     revalidatePath('/finance/expenses')
-    return ok(null)
-  } catch (e) {
-    if (e instanceof AppError) return fail(e.message, e.code)
-    throw e
-  }
+    return null
+  })
 }
